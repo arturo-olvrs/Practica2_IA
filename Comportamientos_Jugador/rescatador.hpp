@@ -45,14 +45,40 @@ private:
   // Métodos Privados
 
   /**
-   * @brief Método que determina si el rescatador ve una casilla interesante.
+   * @brief Método que determina la casilla más interesante a la que se puede mover el rescatador.
+   * @param sensores  Estructura de datos que contiene la información de los sensores.
    * 
    * @return  1 si debe moverse a la casilla 1 (TURN_SL)
    *          2 si debe moverse a la casilla 2 (WALK)
    *          3 si debe moverse a la casilla 3 (TURN_SR)
    *          0 si no ve ninguna casilla interesante. En ese caso, hará TURN_L
    */
-  int veoCasillaInteresante(Sensores sensores);
+  int veoCasillaInteresante(const Sensores & sensores);
+
+  /**
+   * @brief Método que determina si la casilla es accesible o no.
+   * @param sensores  Estructura de datos que contiene la información de los sensores.
+   * @param casilla   Número de la casilla a comprobar.
+   * 
+   * @return  true si la casilla es accesible.
+   *          false si la casilla no es accesible.
+   */
+  bool casillaAccesible(const Sensores & sensores, int casilla);
+
+  /**
+   * @brief Método que busca entre las tres casillas del frente del rescatador una casilla de un tipo determinado.
+   * 
+   * @param sensores  Estructura de datos que contiene la información de los sensores.
+   * @param tipo      Tipo de casilla a buscar.
+   * 
+   * @return  Número de la casilla encontrada.
+   *          0 si no se encuentra ninguna casilla del tipo indicado.
+   *          1 si se encuentra una casilla del tipo indicado en la casilla 1.
+   *          2 si se encuentra una casilla del tipo indicado en la casilla 2.
+   *          3 si se encuentra una casilla del tipo indicado en la casilla 3.
+   */
+  int buscaCasilla(const Sensores & sensores, char tipo);
+
 };
 
 #endif

@@ -32,8 +32,22 @@ int ComportamientoRescatador::interact(Action accion, int valor)
 	return 0;
 }
 
+bool ComportamientoRescatador::casillaAccesible(const Sensores & sensores, int casilla)
+{
+	// Comprobamos si la casilla es accesible o no. Será accesible si:
+	// 1. No es un precipicio
+	// 2. La diferencia de altura entre la casilla y la cota del rescatador es <= 1
+	// 3. Si el rescatador tiene zapatillas, la diferencia de altura puede ser <= 2
+	bool res = false;
+	
+	int dif = abs(sensores.cota[0] - sensores.cota[casilla]);
+	res = sensores.superficie[casilla] != 'P' && (dif<=1 || (tieneZapatillas && dif <=2));
 
-int ComportamientoRescatador::veoCasillaInteresante(Sensores sensores){
+	return res;
+}
+
+int ComportamientoRescatador::buscaCasilla(const Sensores & sensores, char tipo)
+{
 
 	int res = 0;
 
@@ -44,24 +58,29 @@ int ComportamientoRescatador::veoCasillaInteresante(Sensores sensores){
 
 	// Iteramos por tanto 2,3,1
 
+	if (casillaAccesible(sensores, 2) && sensores.superficie[2] == tipo) res = 2;
+	else if (casillaAccesible(sensores, 3) && sensores.superficie[3] == tipo) res = 3;
+	else if (casillaAccesible(sensores, 1) && sensores.superficie[1] == tipo) res = 1;
+
+	return res;
+}
+
+
+int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
+
+	int res = 0;
+
 	// Comenzamos por identificar puesto base
-	if (sensores.superficie[2] == 'X') res = 2;
-	else if (sensores.superficie[3] == 'X') res = 3;
-	else if (sensores.superficie[1] == 'X') res = 1;
+	res = buscaCasilla(sensores, 'X');
 
 	// Si no hay puesto base y no tengo zapatillas, miro si hay zapatillas
-	if (res == 0 && !tieneZapatillas){
-		if (sensores.superficie[2] == 'D') res = 2;
-		else if (sensores.superficie[3] == 'D') res = 3;
-		else if (sensores.superficie[1] == 'D') res = 1;
-	}
+	if (res == 0 && !tieneZapatillas)
+		res = buscaCasilla(sensores, 'D');
 	
-	// Si no hay puesto base ni zapatillas, miro si hay una casilla de interés
-	if (res == 0){
-		if (sensores.superficie[2] == 'C') res = 2;
-		else if (sensores.superficie[3] == 'C') res = 3;
-		else if (sensores.superficie[1] == 'C') res = 1;
-	}
+	
+	// Si no hay puesto base ni zapatillas, miro si hay un camino
+	if (res == 0)
+		res = buscaCasilla(sensores, 'C');
 
 	return res;
 }
