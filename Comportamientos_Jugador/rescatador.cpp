@@ -1,6 +1,8 @@
 #include "../Comportamientos_Jugador/rescatador.hpp"
 #include "motorlib/util.h"
 
+#include <iostream>
+
 Action ComportamientoRescatador::think(Sensores sensores)
 {
 	Action accion = IDLE;
@@ -38,12 +40,12 @@ bool ComportamientoRescatador::casillaAccesible(const Sensores & sensores, int c
 	// 1. No es un precipicio
 	// 2. La diferencia de altura entre la casilla y la cota del rescatador es <= 1
 	// 3. Si el rescatador tiene zapatillas, la diferencia de altura puede ser <= 2
-	bool res = false;
+	bool accesible = sensores.agentes[casilla] == '_'; // No hay agentes en la casilla
 	
 	int dif = abs(sensores.cota[0] - sensores.cota[casilla]);
-	res = sensores.superficie[casilla] != 'P' && (dif<=1 || (tieneZapatillas && dif <=2));
+	accesible &= (sensores.superficie[casilla] != 'P') && (dif<=1 || (tieneZapatillas && dif <=2));
 
-	return res;
+	return accesible;
 }
 
 int ComportamientoRescatador::buscaCasilla(const Sensores & sensores, char tipo)
