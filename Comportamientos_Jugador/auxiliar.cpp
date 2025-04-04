@@ -1,6 +1,7 @@
 #include "../Comportamientos_Jugador/auxiliar.hpp"
 #include <iostream>
 #include "motorlib/util.h"
+#include "math.h"
 
 Action ComportamientoAuxiliar::think(Sensores sensores)
 {
@@ -31,6 +32,137 @@ Action ComportamientoAuxiliar::think(Sensores sensores)
 int ComportamientoAuxiliar::interact(Action accion, int valor)
 {
 	return 0;
+}
+
+
+
+void ComportamientoAuxiliar::situarSensorEnMapa(
+	vector<vector<unsigned char>> &mResultado, 
+	vector<vector<unsigned char>> &mCotas,
+	Sensores sensores)
+{	
+	// Número de casillas hacia delante que ve el agente
+	const int PROFUNDIDAD_SENSOR = 3;
+
+	// No debo preocuparme por salirme del mapa, puesto que las tres ultimas filas/columnas son precipicios
+	// y no se puede acceder a ellas.
+
+	mResultado	[sensores.posF][sensores.posC] = sensores.superficie[0];
+	mCotas		[sensores.posF][sensores.posC] = sensores.cota[0];
+
+	// Relativo al agente.
+	int numDelante;				// 1 casilla hacia delante del agente indica la variación de fila/columna
+	int numDcha;				// 1 casilla hacia la derecha del agente indica la variación de fila/columna
+	bool rumboHorizontal; 		// True si la rumbo es horizontal
+	
+
+	switch (sensores.rumbo)
+	{
+	case norte:
+	case noreste:
+		numDelante = -1;
+		numDcha = 1;
+		rumboHorizontal = false;
+		break;
+	case sur:
+		numDelante = 1;
+		numDcha = -1;
+		rumboHorizontal = false;
+		break;
+	case este:
+		numDelante = 1;
+		numDcha = 1;
+		rumboHorizontal = true;
+		break;
+	case oeste:
+		numDelante = -1;
+		numDcha = -1;
+		rumboHorizontal = true;
+		break;		
+	}
+
+
+	int fila;		// Fila de la casilla a comprobar. Relativa al mapa
+	int columna;	// Columna de la casilla a comprobar. Relativa al mapa
+	int varDelante;	// Variación hacia delante. Relativa al agente y su rumbo
+	int varDcha;	// Variación hacia la derecha. Relativa al agente su rumbo
+	int casilla;	// Numeración de la casilla a comprobar. Relativa al sensor del agente
+
+	switch (sensores.rumbo)
+	{
+	case norte:
+	case sur:
+	case este:
+	case oeste:
+		// Iteramos en primer lugar por la diferencia de delante con el agente
+		for (int diffDelante=1; diffDelante <= PROFUNDIDAD_SENSOR; diffDelante++){
+			varDelante 	= numDelante * diffDelante;
+
+			// Iteramos por la diferencia de derecha con el agente
+			for (int diffDcha=-diffDelante; diffDcha <= diffDelante; diffDcha++)
+			{
+				casilla = diffDelante*(diffDelante+1) + diffDcha;
+
+				
+				varDcha 	= numDcha * diffDcha;				
+				if (rumboHorizontal){
+					fila 	= sensores.posF + varDcha;
+					columna = sensores.posC + varDelante;
+				}else{
+					fila 	= sensores.posF + varDelante;
+					columna = sensores.posC + varDcha;
+				}
+				
+				mResultado	[fila][columna] = sensores.superficie	[casilla];
+				mCotas		[fila][columna] = sensores.cota			[casilla];
+			}
+		}
+		break;
+	
+	case noreste:
+	case sureste:
+	case suroeste:
+	case noroeste:
+		
+		// Iteramos en primer lugar por la diferencia de delante con el agente
+		for (int diffDelante=1; diffDelante <= PROFUNDIDAD_SENSOR; diffDelante++){
+
+			// Iteramos por la diferencia de derecha con el agente
+			for (int diffDcha=-diffDelante; diffDcha <= 0; diffDcha++){
+				casilla = diffDelante*(diffDelante+1) + diffDcha;
+
+				varDelante 	= numDelante * diffDelante;
+				varDcha 	= numDcha * diffDcha;
+				fila 	= sensores.posF + varDelante;
+				columna = sensores.posC + (varDcha+diffDelante);
+				
+				mResultado	[fila][columna] = sensores.superficie	[casilla];
+				mCotas		[fila][columna] = sensores.cota			[casilla];
+			}
+			// TODO: Arreglar este bucle
+			// TODO: Arreglar las variaciones
+			for (int diffDcha=1; diffDcha <= diffDelante; diffDcha++){
+				casilla = diffDelante*(diffDelante+1) + diffDcha;
+
+				varDelante 	= numDelante * diffDelante;
+				varDcha 	= numDcha * diffDcha;
+				fila 	= sensores.posF - (varDcha+diffDelante);
+				columna = sensores.posC - varDelante;
+				
+				mResultado	[fila][columna] = sensores.superficie	[casilla];
+				mCotas		[fila][columna] = sensores.cota			[casilla];
+			}
+		}
+		break;
+	}
+
+
+			
+
+
+	
+	
+	
 }
 
 bool ComportamientoAuxiliar::casillaAccesible(const Sensores & sensores, int casilla)
@@ -94,6 +226,7 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_0(Sensores sensores)
 	Action action = IDLE;	// Acción por defecto.
 
 	// Actualización de variables de estado.
+	situarSensorEnMapa(mapaResultado, mapaCotas, sensores);
 	if (sensores.superficie[0] == 'D')
 		tieneZapatillas = true;
 	

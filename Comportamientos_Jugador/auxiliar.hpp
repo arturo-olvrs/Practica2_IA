@@ -79,11 +79,11 @@ private:
   /**
    * @brief Método que actualiza la información de los sensores en los mapas del agente.
    * 
-   * @param mResultad  Mapa de resultados del agente.
+   * @param mResultado  Mapa de resultados del agente.
    * @param mCotas     Mapa de cotas del agente.
    * @param sensores   Estructura de datos que contiene la información de los sensores.
    */
-  void situarSensorEnMapa(vector<vector<unsigned char>> &mResultad, 
+  void situarSensorEnMapa(vector<vector<unsigned char>> &mResultado, 
                           vector<vector<unsigned char>> &mCotas,
                           Sensores sensores);
 };
