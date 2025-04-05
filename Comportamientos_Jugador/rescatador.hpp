@@ -79,6 +79,17 @@ private:
    */
   int buscaCasilla(const Sensores & sensores, char tipo);
 
+  /**
+   * @brief Método que actualiza la información de los sensores en los mapas del agente.
+   * 
+   * @param mResultado  Mapa de resultados del agente.
+   * @param mCotas     Mapa de cotas del agente.
+   * @param sensores   Estructura de datos que contiene la información de los sensores.
+   */
+  void situarSensorEnMapa(vector<vector<unsigned char>> &mResultado, 
+    vector<vector<unsigned char>> &mCotas,
+    Sensores sensores);
+
 };
 
 #endif

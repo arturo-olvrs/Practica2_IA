@@ -13,7 +13,7 @@ Action ComportamientoAuxiliar::think(Sensores sensores)
 		accion = ComportamientoAuxiliarNivel_0 (sensores);
 		break;
 	case 1:
-		// accion = ComportamientoAuxiliarNivel_1 (sensores);
+		//accion = ComportamientoAuxiliarNivel_1 (sensores);
 		break;
 	case 2:
 		// accion = ComportamientoAuxiliarNivel_2 (sensores);
@@ -65,16 +65,19 @@ void ComportamientoAuxiliar::situarSensorEnMapa(
 		rumboHorizontal = false;
 		break;
 	case sur:
+	case suroeste:
 		numDelante = 1;
 		numDcha = -1;
 		rumboHorizontal = false;
 		break;
 	case este:
+	case sureste:
 		numDelante = 1;
 		numDcha = 1;
 		rumboHorizontal = true;
 		break;
 	case oeste:
+	case noroeste:
 		numDelante = -1;
 		numDcha = -1;
 		rumboHorizontal = true;
@@ -128,26 +131,43 @@ void ComportamientoAuxiliar::situarSensorEnMapa(
 		for (int diffDelante=1; diffDelante <= PROFUNDIDAD_SENSOR; diffDelante++){
 
 			// Iteramos por la diferencia de derecha con el agente
+
+			// Primero hasta llegar a la diagonal. Debemos mantener fila fija
 			for (int diffDcha=-diffDelante; diffDcha <= 0; diffDcha++){
 				casilla = diffDelante*(diffDelante+1) + diffDcha;
 
-				varDelante 	= numDelante * diffDelante;
-				varDcha 	= numDcha * diffDcha;
-				fila 	= sensores.posF + varDelante;
-				columna = sensores.posC + (varDcha+diffDelante);
-				
+				if (rumboHorizontal){
+					varDcha		= numDelante * (diffDcha+diffDelante);
+					varDelante 	= numDcha * diffDelante;
+					fila 		= sensores.posF + varDcha;
+					columna 	= sensores.posC + varDelante;
+				}else{
+					varDelante 	= numDelante * diffDelante;
+					varDcha 	= numDcha * (diffDcha+diffDelante);
+					fila 		= sensores.posF + varDelante;
+					columna 	= sensores.posC + varDcha;
+				}
+
 				mResultado	[fila][columna] = sensores.superficie	[casilla];
 				mCotas		[fila][columna] = sensores.cota			[casilla];
 			}
-			// TODO: Arreglar este bucle
-			// TODO: Arreglar las variaciones
+
+			// Una vez pasada la diagonal
 			for (int diffDcha=1; diffDcha <= diffDelante; diffDcha++){
 				casilla = diffDelante*(diffDelante+1) + diffDcha;
 
-				varDelante 	= numDelante * diffDelante;
-				varDcha 	= numDcha * diffDcha;
-				fila 	= sensores.posF - (varDcha+diffDelante);
-				columna = sensores.posC - varDelante;
+
+				if (rumboHorizontal){
+					varDelante 	= numDelante * diffDelante;
+					varDcha 	= numDcha * (diffDelante-diffDcha);
+					fila 		= sensores.posF + varDelante;
+					columna 	= sensores.posC + varDcha;
+				}else{
+					varDcha		= numDelante * (diffDelante-diffDcha);
+					varDelante 	= numDcha * diffDelante;
+					fila 		= sensores.posF + varDcha;
+					columna 	= sensores.posC + varDelante;
+				}
 				
 				mResultado	[fila][columna] = sensores.superficie	[casilla];
 				mCotas		[fila][columna] = sensores.cota			[casilla];
@@ -155,14 +175,6 @@ void ComportamientoAuxiliar::situarSensorEnMapa(
 		}
 		break;
 	}
-
-
-			
-
-
-	
-	
-	
 }
 
 bool ComportamientoAuxiliar::casillaAccesible(const Sensores & sensores, int casilla)
