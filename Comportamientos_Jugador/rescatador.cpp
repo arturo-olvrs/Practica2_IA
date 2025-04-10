@@ -1,5 +1,9 @@
 #include "../Comportamientos_Jugador/rescatador.hpp"
 #include "motorlib/util.h"
+#include <cmath>
+#include <vector>
+#include <algorithm>
+#include <map>
 
 #include <iostream>
 
@@ -35,25 +39,28 @@ int ComportamientoRescatador::interact(Action accion, int valor)
 }
 
 
-void ComportamientoRescatador::situarSensorEnMapa(
-	vector<vector<unsigned char>> &mResultado, 
-	vector<vector<unsigned char>> &mCotas,
-	Sensores sensores)
-{	
-	// Número de casillas hacia delante que ve el agente
-	const int PROFUNDIDAD_SENSOR = 3;
 
-	// No debo preocuparme por salirme del mapa, puesto que las tres ultimas filas/columnas son precipicios
-	// y no se puede acceder a ellas.
 
-	mResultado	[sensores.posF][sensores.posC] = sensores.superficie[0];
-	mCotas		[sensores.posF][sensores.posC] = sensores.cota[0];
+pair<int, int> ComportamientoRescatador::aCoordenadas(const Sensores& sensores, int casillaRelativa)
+{
 
-	// Relativo al agente.
+
+  	// Relativo al agente.
 	int numDelante;				// 1 casilla hacia delante del agente indica la variación de fila/columna
 	int numDcha;				// 1 casilla hacia la derecha del agente indica la variación de fila/columna
 	bool rumboHorizontal; 		// True si la rumbo es horizontal
-	
+
+	// Exclusivo para las casillas de los lateras
+	// De mi izquierda a mi derecha: -1,-2,-3=YO, -4,-5
+	// -1->-2, -2->-1, -3=0, -4->1, -5->2
+	map<int, int> mapaCasillasLaterales = {
+		{-1, -2},
+		{-2, -1},
+		{-3, 0},
+		{-4, 1},
+		{-5, 2}
+	};
+
 
 	switch (sensores.rumbo)
 	{
@@ -83,12 +90,22 @@ void ComportamientoRescatador::situarSensorEnMapa(
 		break;		
 	}
 
-
-	int fila;		// Fila de la casilla a comprobar. Relativa al mapa
-	int columna;	// Columna de la casilla a comprobar. Relativa al mapa
+	int fila;		// Fila de la casilla. Relativa al mapa
+	int columna;	// Columna de la casilla. Relativa al mapa
 	int varDelante;	// Variación hacia delante. Relativa al agente y su rumbo
 	int varDcha;	// Variación hacia la derecha. Relativa al agente su rumbo
-	int casilla;	// Numeración de la casilla a comprobar. Relativa al sensor del agente
+
+	int diffDelante;	// Diferencia de la casilla hacia delante. Con respecto al agente
+	int diffDcha;		// Diferencia de la casilla hacia la derecha. Con respecto al agente
+	if (mapaCasillasLaterales.find(casillaRelativa) != mapaCasillasLaterales.end()){
+		diffDelante = 0;
+		diffDcha = mapaCasillasLaterales[casillaRelativa];
+	}else{
+		diffDelante = floor(sqrt(casillaRelativa));
+		int casillaCentralFila = diffDelante*diffDelante + diffDelante;
+		diffDcha = casillaRelativa - casillaCentralFila;
+	}
+
 
 	switch (sensores.rumbo)
 	{
@@ -96,28 +113,14 @@ void ComportamientoRescatador::situarSensorEnMapa(
 	case sur:
 	case este:
 	case oeste:
-		// Iteramos en primer lugar por la diferencia de delante con el agente
-		for (int diffDelante=1; diffDelante <= PROFUNDIDAD_SENSOR; diffDelante++){
-			varDelante 	= numDelante * diffDelante;
-
-			// Iteramos por la diferencia de derecha con el agente
-			for (int diffDcha=-diffDelante; diffDcha <= diffDelante; diffDcha++)
-			{
-				casilla = diffDelante*(diffDelante+1) + diffDcha;
-
-				
-				varDcha 	= numDcha * diffDcha;				
-				if (rumboHorizontal){
-					fila 	= sensores.posF + varDcha;
-					columna = sensores.posC + varDelante;
-				}else{
-					fila 	= sensores.posF + varDelante;
-					columna = sensores.posC + varDcha;
-				}
-				
-				mResultado	[fila][columna] = sensores.superficie	[casilla];
-				mCotas		[fila][columna] = sensores.cota			[casilla];
-			}
+		varDelante 	= numDelante * diffDelante;	
+		varDcha 	= numDcha * diffDcha;				
+		if (rumboHorizontal){
+			fila 	= sensores.posF + varDcha;
+			columna = sensores.posC + varDelante;
+		}else{
+			fila 	= sensores.posF + varDelante;
+			columna = sensores.posC + varDcha;
 		}
 		break;
 	
@@ -125,57 +128,65 @@ void ComportamientoRescatador::situarSensorEnMapa(
 	case sureste:
 	case suroeste:
 	case noroeste:
-		
-		// Iteramos en primer lugar por la diferencia de delante con el agente
-		for (int diffDelante=1; diffDelante <= PROFUNDIDAD_SENSOR; diffDelante++){
 
-			// Iteramos por la diferencia de derecha con el agente
-
-			// Primero hasta llegar a la diagonal. Debemos mantener fila fija
-			for (int diffDcha=-diffDelante; diffDcha <= 0; diffDcha++){
-				casilla = diffDelante*(diffDelante+1) + diffDcha;
-
-				if (rumboHorizontal){
-					varDcha		= numDelante * (diffDcha+diffDelante);
-					varDelante 	= numDcha * diffDelante;
-					fila 		= sensores.posF + varDcha;
-					columna 	= sensores.posC + varDelante;
-				}else{
-					varDelante 	= numDelante * diffDelante;
-					varDcha 	= numDcha * (diffDcha+diffDelante);
-					fila 		= sensores.posF + varDelante;
-					columna 	= sensores.posC + varDcha;
-				}
-
-				mResultado	[fila][columna] = sensores.superficie	[casilla];
-				mCotas		[fila][columna] = sensores.cota			[casilla];
+		if (diffDcha <= 0){
+			if (rumboHorizontal){
+				varDcha		= numDelante * (diffDcha+diffDelante);
+				varDelante 	= numDcha * diffDelante;
+				fila 		= sensores.posF + varDcha;
+				columna 	= sensores.posC + varDelante;
+			}else{
+				varDelante 	= numDelante * diffDelante;
+				varDcha 	= numDcha * (diffDcha+diffDelante);
+				fila 		= sensores.posF + varDelante;
+				columna 	= sensores.posC + varDcha;
 			}
-
-			// Una vez pasada la diagonal
-			for (int diffDcha=1; diffDcha <= diffDelante; diffDcha++){
-				casilla = diffDelante*(diffDelante+1) + diffDcha;
-
-
-				if (rumboHorizontal){
-					varDelante 	= numDelante * diffDelante;
-					varDcha 	= numDcha * (diffDelante-diffDcha);
-					fila 		= sensores.posF + varDelante;
-					columna 	= sensores.posC + varDcha;
-				}else{
-					varDcha		= numDelante * (diffDelante-diffDcha);
-					varDelante 	= numDcha * diffDelante;
-					fila 		= sensores.posF + varDcha;
-					columna 	= sensores.posC + varDelante;
-				}
-				
-				mResultado	[fila][columna] = sensores.superficie	[casilla];
-				mCotas		[fila][columna] = sensores.cota			[casilla];
+		}else{
+			if (rumboHorizontal){
+				varDelante 	= numDelante * diffDelante;
+				varDcha 	= numDcha * (diffDelante-diffDcha);
+				fila 		= sensores.posF + varDelante;
+				columna 	= sensores.posC + varDcha;
+			}else{
+				varDcha		= numDelante * (diffDelante-diffDcha);
+				varDelante 	= numDcha * diffDelante;
+				fila 		= sensores.posF + varDcha;
+				columna 	= sensores.posC + varDelante;
 			}
 		}
 		break;
 	}
+
+	return make_pair(fila, columna);
 }
 
+
+
+void ComportamientoRescatador::situarSensorEnMapa(
+	vector<vector<unsigned char>> &mResultado, 
+	vector<vector<unsigned char>> &mCotas,
+	Sensores sensores)
+{	
+	// Número de casillas hacia delante que ve el agente (incluyendo la suya misma)
+	const int PROFUNDIDAD_SENSOR = 4;
+	
+	int num_casillas = PROFUNDIDAD_SENSOR*PROFUNDIDAD_SENSOR;
+	for (int i=0; i<num_casillas; ++i){
+		int fila, columna;
+		tie(fila, columna) = aCoordenadas(sensores, i);
+		
+		mResultado	[fila][columna] = sensores.superficie[i];
+		mCotas		[fila][columna] = sensores.cota[i];
+	}
+}
+
+void ComportamientoRescatador::reinicializarVecesVisitada()
+{
+	// Reinicializamos el mapa de veces visitadas
+	for (auto fila = numVecesVisitada.begin(); fila != numVecesVisitada.end(); ++fila)
+		for (auto col = fila->begin(); col != fila->end(); ++col)
+			*col = 0;
+}
 
 bool ComportamientoRescatador::casillaAccesible(const Sensores & sensores, int casilla)
 {
@@ -183,50 +194,120 @@ bool ComportamientoRescatador::casillaAccesible(const Sensores & sensores, int c
 	// 1. No es un precipicio
 	// 2. La diferencia de altura entre la casilla y la cota del rescatador es <= 1
 	// 3. Si el rescatador tiene zapatillas, la diferencia de altura puede ser <= 2
-	bool accesible = sensores.agentes[casilla] == '_'; // No hay agentes en la casilla
+	bool accesible = true;
+	if (0<= casilla && casilla < 16)
+		accesible &= sensores.agentes[casilla] == '_'; // No hay agentes en la casilla
+
+	int fil, col;
+	tie(fil, col) = aCoordenadas(sensores, casilla);
 	
-	int dif = abs(sensores.cota[0] - sensores.cota[casilla]);
-	accesible &= (sensores.superficie[casilla] != 'P') && (dif<=1 || (tieneZapatillas && dif <=2));
+	int dif = abs(mapaCotas[sensores.posF][sensores.posC] - mapaCotas[fil][col]);
+	accesible &= (mapaResultado[fil][col] != 'P') && (dif<=1 || (tieneZapatillas && dif <=2));
 
 	return accesible;
 }
 
-int ComportamientoRescatador::buscaCasilla(const Sensores & sensores, char tipo)
-{
-
-	int res = 0;
-
-	// Prioridad:
-	// 1. WALK		(costará un paso)
-	// 2. TURN_SL	(costará un giro + un paso)
-	// 3. TURN_SR 	(costará dos giros + un paso)
-
-	// Iteramos por tanto 2,3,1
-
-	if (casillaAccesible(sensores, 2) && sensores.superficie[2] == tipo) res = 2;
-	else if (casillaAccesible(sensores, 3) && sensores.superficie[3] == tipo) res = 3;
-	else if (casillaAccesible(sensores, 1) && sensores.superficie[1] == tipo) res = 1;
-
-	return res;
-}
-
-
 int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 
-	int res = 0;
+	// Tipos de casillas permitidas
+	const vector<char> tiposCasillasPermitidas = {'X', 'D', 'C'}; // X: puesto base, D: zapatillas, C: camino
 
-	// Comenzamos por identificar puesto base
-	res = buscaCasilla(sensores, 'X');
+	// Obtenemos las casillas accesibles ***SOLO POR CAMINOS***
+	// Casilla Alcanzable: Casilla que puedo alcanzar (posiblemente no pueda acceder)
+	// Casilla Accesible: Casilla que puedo alcanzar y es accesible
+	// Casilla Alcanzable Directa: Casilla que puedo alcanzar directamente
+	// Casilla Alcanzable Indirecta: Casilla que puedo alcanzar indirectamente, he de comprobar que la casilla intermedia es accesible
 
-	// Si no hay puesto base y no tengo zapatillas, miro si hay zapatillas
-	if (res == 0 && !tieneZapatillas)
-		res = buscaCasilla(sensores, 'D');
+	// El orden de las casillas es relevante para hacer el mínimo número de pasos. Lo buscado: 6 8 4 2 3 1
+	// TODO: Cambiar el orden. Debe ser: 6 8 4 2 3 1 -4 -5 -2 -4
+	const vector<int> casillasAlcanzablesDirectas 	= {2,3,1,-2,-4};	// Se introducen en dicho orden
+	const vector<int> casillasAlcanzablesIndirectas = {6,8,4,-4,-5};	// Se introducen en dicho orden
+	vector<int> casillasAccesibles;
+	cout << "Inicio1" << endl;
+	int fil,col;
+	for (int i=0; i<casillasAlcanzablesIndirectas.size(); i++){
+		// Para llegar a casillasAlcanzablesIndirectas[i], ha de pasar por casillasAccesibleDirectas[i]
+		int casillaIntermedia 	= casillasAlcanzablesDirectas[i];
+		int casillaFinal 		= casillasAlcanzablesIndirectas[i];
+		cout << "Inicio2" << endl;
+		if (casillaAccesible(sensores, casillaIntermedia) && casillaAccesible(sensores, casillaFinal)){
+
+			tie(fil,col) = aCoordenadas(sensores, casillaFinal);
+			bool ambasPermitidas = 	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado[fil][col]) != tiposCasillasPermitidas.end();
+
+			if (ambasPermitidas){
+				tie(fil,col) = aCoordenadas(sensores, casillaIntermedia);
+				ambasPermitidas = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado[fil][col]) != tiposCasillasPermitidas.end();
+			}
+
+			if (ambasPermitidas)
+				casillasAccesibles.push_back(casillaFinal);
+		}
+		cout << "Fin2" << endl;
+	}
+	for (auto i = casillasAlcanzablesDirectas.begin(); i != casillasAlcanzablesDirectas.end(); ++i){
+		if (casillaAccesible(sensores, *i)){
+			tie(fil,col)=aCoordenadas(sensores, *i);
+			bool permitida = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado[fil][col]) != tiposCasillasPermitidas.end();
+			if (permitida)
+				casillasAccesibles.push_back(*i);
+		}
+	}
+	cout << "Fin1" << endl;
+
+	cout << "Casillas accesibles: ";
+	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
+		tie(fil,col)=aCoordenadas(sensores, *i);
+		cout << "(" << fil << "," << col << ") " << mapaResultado[fil][col] << " " << *i << endl;
+	}
+
+
+
+	// Buscamos la casilla más interesante a la que ir
+	int res = 0;	// Por defecto no veo nada interesante
+
+	// Buscamos primero el puesto base
+	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
+		tie(fil, col) = aCoordenadas(sensores, *i);
+		if (mapaResultado[fil][col] == 'X')
+			res = *i;
+	}
 	
+	// Si no hay puesto base, miro si hay zapatillas
+	if (!tieneZapatillas){
+		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
+			tie(fil, col) = aCoordenadas(sensores, *i);
+			if (mapaResultado[fil][col] == 'D')
+				res = *i;
+		}
+	}
+			
 	
-	// Si no hay puesto base ni zapatillas, miro si hay un camino
-	if (res == 0)
-		res = buscaCasilla(sensores, 'C');
+	// Ahora, buscamos caminos. Pero tenemos que ver cuál es el más interesante
+	// Criterio: menor número de veces visitada. A iguadad, nos quedamos con la primera
+	cout << "Inicio3" << endl;
+	if (res==0 && !casillasAccesibles.empty()){
+		int fil, col;
+		int minVecesVisitada; 	// Número mínimo (hasta ahora) de veces visitada
 
+		// Minimo por el momento. La primera casilla accesible que sea CAMINO.
+		// No debo comprobar que sea accesible, ya lo he hecho antes
+		// No debo comprobar que sea un camino, porque no hay ni zapatillas ni puesto base
+		tie(fil, col) = aCoordenadas(sensores, casillasAccesibles[0]);
+		minVecesVisitada = numVecesVisitada[fil][col];
+		res = casillasAccesibles[0];
+
+		// Buscamos la casilla con menor número de veces visitada
+		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
+			tie(fil, col) = aCoordenadas(sensores, *i);
+			if (numVecesVisitada[fil][col] < minVecesVisitada){
+				minVecesVisitada = numVecesVisitada[fil][col];
+				res = *i;
+			}
+		}
+	}
+	cout << "Fin3" << endl;
+	
 	return res;
 }
 
@@ -234,11 +315,12 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 Action ComportamientoRescatador::ComportamientoRescatadorNivel_0(Sensores sensores)
 {
 	// El comportamiento de seguir un camino hasta encontrar un puesto base.
-	
+
 	Action action = IDLE;	// Acción por defecto.
 
 	// Actualización de variables de estado.
 	situarSensorEnMapa(mapaResultado, mapaCotas, sensores);
+	numVecesVisitada[sensores.posF][sensores.posC]++;
 	if (sensores.superficie[0] == 'D')
 		tieneZapatillas = true;
 	
@@ -250,14 +332,15 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_0(Sensores sensor
 		action = Action::TURN_SR;
 		inTURN_SL = false;
 	}
+	else if (inTURN_R){		// Está en su giro R
+		action = Action::TURN_SR;
+		inTURN_R = false;
+	}
 	else{ // Vamos a realizar el movimiento determinado por lo que veo
-
 		int res = veoCasillaInteresante(sensores);
 		switch (res){
-			case 0: // No veo nada interesante
-				action = Action::TURN_L;
-				break;
 			case 1: // TURN_SL
+			case 4:
 				inTURN_SL = true;
 				action = Action::TURN_L;
 				break;
@@ -265,7 +348,23 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_0(Sensores sensor
 				action = Action::WALK;
 				break;
 			case 3: // TURN_SR
+			case 8:
 				action = Action::TURN_SR;
+				break;
+			case 6: // RUN
+				action = Action::RUN;
+				break;
+			case -1: // TURN_L
+			case -2:
+				action = Action::TURN_L;
+				break;
+			case -4:
+			case -5:
+				inTURN_R = true;
+				action = Action::TURN_SR;
+				break;
+			default: // No veo nada interesante
+				action = Action::TURN_L;
 				break;
 		}
 

@@ -17,6 +17,11 @@ public:
     lastAction = Action::IDLE;
     tieneZapatillas = false;
     inTURN_SL = false;
+    inTURN_R = false;
+
+    // Inicializar el mapa de veces visitadas
+    vector<int> fila(size, 0);
+    numVecesVisitada.resize(size, fila);
   }
   ComportamientoRescatador(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
@@ -40,6 +45,8 @@ private:
   Action lastAction;      // Almacena la última acción realizada por el rescatador
   bool tieneZapatillas;   // Indica si el rescatador tiene zapatillas
   bool inTURN_SL;          // Indica si el rescatador está en su turno de SL
+  bool inTURN_R;          // Indica si el rescatador está en su turno de SR
+  vector<vector<int>> numVecesVisitada;
 
 
   // Métodos Privados
@@ -66,20 +73,6 @@ private:
   bool casillaAccesible(const Sensores & sensores, int casilla);
 
   /**
-   * @brief Método que busca entre las tres casillas del frente del rescatador una casilla de un tipo determinado.
-   * 
-   * @param sensores  Estructura de datos que contiene la información de los sensores.
-   * @param tipo      Tipo de casilla a buscar.
-   * 
-   * @return  Número de la casilla encontrada.
-   *          0 si no se encuentra ninguna casilla del tipo indicado.
-   *          1 si se encuentra una casilla del tipo indicado en la casilla 1.
-   *          2 si se encuentra una casilla del tipo indicado en la casilla 2.
-   *          3 si se encuentra una casilla del tipo indicado en la casilla 3.
-   */
-  int buscaCasilla(const Sensores & sensores, char tipo);
-
-  /**
    * @brief Método que actualiza la información de los sensores en los mapas del agente.
    * 
    * @param mResultado  Mapa de resultados del agente.
@@ -89,6 +82,26 @@ private:
   void situarSensorEnMapa(vector<vector<unsigned char>> &mResultado, 
     vector<vector<unsigned char>> &mCotas,
     Sensores sensores);
+  
+  /**
+   * @brief Método que reinicializa el mapa de veces visitadas.
+   * 
+   * @post  El mapa de veces visitadas se reinicializa a 0.
+   */
+  void reinicializarVecesVisitada();
+
+
+
+/**
+ * @brief Método que devuelve las coordenadas en el mapa de la casilla relativa a la posición del agente.
+ * 
+ * @param casillaRelativa  Número de la casilla relativa al agente.
+ * @param sensores      Sensores del agente
+ * 
+ * @return  Un par de enteros que representan las coordenadas de la casilla en el mapa.
+ *          El primer entero es la fila y el segundo entero es la columna.
+ */
+pair<int, int> aCoordenadas(const Sensores& sensores, int casillaRelativa);
 
 };
 
