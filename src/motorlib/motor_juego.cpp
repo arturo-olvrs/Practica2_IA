@@ -923,13 +923,13 @@ void lanzar_motor_juego2(MonitorJuego &monitor)
   }
   else if (monitor.mostrarResultados() and (monitor.getLevel() == 2))
   {
-    std::cout << "Longitud del camino (Rescatador): " << 2999 - monitor.get_entidad(0)->getInstantesPendientes() << endl;
+    std::cout << "Longitud del camino (Rescatador): " << 3000 - monitor.get_entidad(0)->getInstantesPendientes() << endl;
     std::cout << "Coste de Energía (Rescatador): " << 3000 - monitor.get_entidad(0)->getBateria() << endl;
     monitor.setMostrarResultados(false);
   }
   else if (monitor.mostrarResultados() and monitor.getLevel() == 3)
   {
-    std::cout << "Longitud del camino (Auxiliar): " << 2999 - monitor.get_entidad(1)->getInstantesPendientes() << endl;
+    std::cout << "Longitud del camino (Auxiliar): " << 3000 - monitor.get_entidad(1)->getInstantesPendientes() << endl;
     std::cout << "Coste de Energía (Auxiliar): " << 3000 - monitor.get_entidad(1)->getBateria() << endl;
     monitor.setMostrarResultados(false);
   }
