@@ -52,6 +52,7 @@ tests_0=(
 )
 tests_1=(
     "$ejecutable ./mapas/mapa30.map 0 1 6 3 0 21 15 2"
+    "$ejecutable ./mapas/mapa50_cuadricula.map 0 1 40 19 6 36 45 1"
 )
 for test in "${tests_0[@]}"; do
     test_1=$(echo "$test" | awk '{ $4=1; print }')

@@ -22,6 +22,7 @@ public:
     // Inicializar el mapa de veces visitadas
     vector<int> fila(size, 0);
     numVecesVisitada.resize(size, fila);
+    numVecesVista.resize(size, fila);
   }
   ComportamientoRescatador(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
@@ -47,6 +48,9 @@ private:
   bool inTURN_SL;          // Indica si el rescatador está en su turno de SL
   bool inTURN_R;          // Indica si el rescatador está en su turno de SR
   vector<vector<int>> numVecesVisitada;
+  vector<vector<int>> numVecesVista;
+  static const int PROFUNDIDAD_SENSOR = 4; // Número de casillas hacia delante que ve el agente (incluyendo la suya misma)
+  static const int NUM_CASILLAS = PROFUNDIDAD_SENSOR * PROFUNDIDAD_SENSOR; // Número de casillas que ve el agente
 
 
   // Métodos Privados
@@ -85,11 +89,11 @@ private:
                           Sensores sensores);
   
   /**
-   * @brief Método que reinicializa el mapa de veces visitadas.
+   * @brief Método que reinicializa el mapa de veces visitadas y vistas.
    * 
-   * @post  El mapa de veces visitadas se reinicializa a 0.
+   * @post  El mapa de veces visitadas y vistas se reinicializa a 0.
    */
-  void reinicializarVecesVisitada();
+  void reinicializarVeces_VistaVisitada();
 
 
 
@@ -103,6 +107,12 @@ private:
    *          El primer entero es la fila y el segundo entero es la columna.
    */
   pair<int, int> aCoordenadas(const Sensores& sensores, int casillaRelativa);
+
+
+  /**
+   * @brief Método que actualiza las matrices de veces visitadas y vistas.
+   */
+  void actualizarMatrices_VistasVisitadas(const Sensores& sensores);
 
 };
 

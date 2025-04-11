@@ -21,6 +21,7 @@ public:
     // Inicializar el mapa de veces visitadas
     vector<int> fila(size, 0);
     numVecesVisitada.resize(size, fila);
+    numVecesVista.resize(size, fila);
   }
   ComportamientoAuxiliar(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
@@ -45,6 +46,9 @@ private:
   bool tieneZapatillas;   // Indica si el auxiliar tiene zapatillas
   int num_TURN_SR_Restantes;  // Indica el número de TURN_SR restantes para lograr TURN_SL
   vector<vector<int>> numVecesVisitada;
+  vector<vector<int>> numVecesVista;
+  static const int PROFUNDIDAD_SENSOR = 4; // Número de casillas hacia delante que ve el agente (incluyendo la suya misma)
+  static const int NUM_CASILLAS = PROFUNDIDAD_SENSOR * PROFUNDIDAD_SENSOR; // Número de casillas que ve el agente
 
 
   // Métodos Privados
@@ -93,6 +97,11 @@ private:
    *          El primer entero es la fila y el segundo entero es la columna.
    */
   pair<int, int> aCoordenadas(const Sensores& sensores, int casillaRelativa);
+
+  /**
+   * @brief Método que actualiza las matrices de veces visitadas y vistas.
+   */
+  void actualizarMatrices_VistasVisitadas(const Sensores& sensores);
 };
 
 #endif

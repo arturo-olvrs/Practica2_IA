@@ -87,8 +87,8 @@ pair<int, int> ComportamientoAuxiliar::aCoordenadas(const Sensores& sensores, in
 		break;		
 	}
 
-	int fila;		// Fila de la casilla. Relativa al mapa
-	int columna;	// Columna de la casilla. Relativa al mapa
+	int fil;		// Fila de la casilla. Relativa al mapa
+	int col;	// Columna de la casilla. Relativa al mapa
 	int varDelante;	// Variación hacia delante. Relativa al agente y su rumbo
 	int varDcha;	// Variación hacia la derecha. Relativa al agente su rumbo
 
@@ -96,7 +96,7 @@ pair<int, int> ComportamientoAuxiliar::aCoordenadas(const Sensores& sensores, in
 	int diffDcha;		// Diferencia de la casilla hacia la derecha. Con respecto al agente
 	if (mapaCasillasLaterales.find(casillaRelativa) != mapaCasillasLaterales.end()){
 		diffDelante = 0;
-		diffDcha = mapaCasillasLaterales[casillaRelativa];
+		diffDcha = mapaCasillasLaterales.at(casillaRelativa);
 	}else{
 		diffDelante = floor(sqrt(casillaRelativa));
 		int casillaCentralFila = diffDelante*diffDelante + diffDelante;
@@ -113,11 +113,11 @@ pair<int, int> ComportamientoAuxiliar::aCoordenadas(const Sensores& sensores, in
 		varDelante 	= numDelante * diffDelante;	
 		varDcha 	= numDcha * diffDcha;				
 		if (rumboHorizontal){
-			fila 	= sensores.posF + varDcha;
-			columna = sensores.posC + varDelante;
+			fil = sensores.posF + varDcha;
+			col = sensores.posC + varDelante;
 		}else{
-			fila 	= sensores.posF + varDelante;
-			columna = sensores.posC + varDcha;
+			fil = sensores.posF + varDelante;
+			col = sensores.posC + varDcha;
 		}
 		break;
 	
@@ -130,31 +130,31 @@ pair<int, int> ComportamientoAuxiliar::aCoordenadas(const Sensores& sensores, in
 			if (rumboHorizontal){
 				varDcha		= numDelante * (diffDcha+diffDelante);
 				varDelante 	= numDcha * diffDelante;
-				fila 		= sensores.posF + varDcha;
-				columna 	= sensores.posC + varDelante;
+				fil = sensores.posF + varDcha;
+				col = sensores.posC + varDelante;
 			}else{
 				varDelante 	= numDelante * diffDelante;
 				varDcha 	= numDcha * (diffDcha+diffDelante);
-				fila 		= sensores.posF + varDelante;
-				columna 	= sensores.posC + varDcha;
+				fil = sensores.posF + varDelante;
+				col = sensores.posC + varDcha;
 			}
 		}else{
 			if (rumboHorizontal){
 				varDelante 	= numDelante * diffDelante;
 				varDcha 	= numDcha * (diffDelante-diffDcha);
-				fila 		= sensores.posF + varDelante;
-				columna 	= sensores.posC + varDcha;
+				fil = sensores.posF + varDelante;
+				col = sensores.posC + varDcha;
 			}else{
 				varDcha		= numDelante * (diffDelante-diffDcha);
 				varDelante 	= numDcha * diffDelante;
-				fila 		= sensores.posF + varDcha;
-				columna 	= sensores.posC + varDelante;
+				fil = sensores.posF + varDcha;
+				col = sensores.posC + varDelante;
 			}
 		}
 		break;
 	}
 
-	return make_pair(fila, columna);
+	return make_pair(fil, col);
 }
 
 
@@ -164,18 +164,24 @@ void ComportamientoAuxiliar::situarSensorEnMapa(
 	vector<vector<unsigned char>> &mCotas,
 	vector<vector<unsigned char>> &mEntidades,
 	Sensores sensores)
-{	
-	// Número de casillas hacia delante que ve el agente (incluyendo la suya misma)
-	const int PROFUNDIDAD_SENSOR = 4;
-	
-	int num_casillas = PROFUNDIDAD_SENSOR*PROFUNDIDAD_SENSOR;
-	for (int i=0; i<num_casillas; ++i){
-		int fila, columna;
-		tie(fila, columna) = aCoordenadas(sensores, i);
+{		
+	for (int i=0; i<NUM_CASILLAS; ++i){
+		int fil, col;
+		tie(fil, col) = aCoordenadas(sensores, i);
 		
-		mResultado	[fila][columna] = sensores.superficie[i];
-		mCotas		[fila][columna] = sensores.cota[i];
-		mEntidades	[fila][columna] = sensores.agentes[i];
+		mResultado.at(fil).at(col) = sensores.superficie.at(i);
+		mCotas.at(fil).at(col) = sensores.cota.at(i);
+		mEntidades.at(fil).at(col) = sensores.agentes.at(i);
+	}
+}
+
+
+void ComportamientoAuxiliar::actualizarMatrices_VistasVisitadas(const Sensores& sensores){
+	numVecesVisitada.at(sensores.posF).at(sensores.posC)++;
+	for (int i=0; i<NUM_CASILLAS; ++i){
+		int fil, col;
+		tie(fil, col) = aCoordenadas(sensores, i);
+		numVecesVista.at(fil).at(col)++;
 	}
 }
 
@@ -187,11 +193,12 @@ bool ComportamientoAuxiliar::casillaAccesible(const Sensores & sensores, int cas
 	int fil, col;
 	tie(fil, col) = aCoordenadas(sensores, casilla);
 
-	bool accesible = mapaEntidades[fil][col] == '_'; // No hay agentes en la casilla
+	// Esta línea se asegura de que alguna vez la ha visto
+	bool accesible = mapaEntidades.at(fil).at(col) == '_'; // No hay agentes en la casilla
 
 	
-	int dif = abs(mapaCotas[sensores.posF][sensores.posC] - mapaCotas[fil][col]);
-	accesible &= mapaResultado[fil][col] != 'P' && (dif<=1);
+	int dif = abs(mapaCotas.at(sensores.posF).at(sensores.posC) - mapaCotas.at(fil).at(col));
+	accesible &= mapaResultado.at(fil).at(col) != 'P' && (dif<=1);
 
 	return accesible;
 }
@@ -217,7 +224,7 @@ int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 	for (auto i = casillasAlcanzables.begin(); i != casillasAlcanzables.end(); ++i){
 		if (casillaAccesible(sensores, *i)){
 			tie(fil,col)=aCoordenadas(sensores, *i);
-			bool permitida = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado[fil][col]) != tiposCasillasPermitidas.end();
+			bool permitida = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
 			if (permitida)
 				casillasAccesibles.push_back(*i);
 		}
@@ -227,7 +234,7 @@ int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 	cout << "Casillas accesibles: " << endl;
 	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
 		tie(fil,col)=aCoordenadas(sensores, *i);
-		cout << "(" << fil << "," << col << ") " << mapaResultado[fil][col] << " " << *i << endl;
+		cout << "(" << fil << "," << col << ") " << mapaResultado.at(fil).at(col) << " " << *i << endl;
 	}
 	#endif
 
@@ -240,7 +247,7 @@ int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 	if (sensores.nivel == 0){
 		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
 			tie(fil, col) = aCoordenadas(sensores, *i);
-			if (mapaResultado[fil][col] == 'X')
+			if (mapaResultado.at(fil).at(col) == 'X')
 				res = *i;
 		}
 	}
@@ -249,30 +256,35 @@ int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 	if (!tieneZapatillas){
 		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
 			tie(fil, col) = aCoordenadas(sensores, *i);
-			if (mapaResultado[fil][col] == 'D')
+			if (mapaResultado.at(fil).at(col) == 'D')
 				res = *i;
 		}
 	}
 			
 	
 	// Ahora, buscamos caminos. Pero tenemos que ver cuál es el más interesante
-	// Criterio: menor número de veces visitada. A iguadad, nos quedamos con la primera
+	// Criterio: menor valor de: PESO_VISTA * numVecesVista + PESO_VISITADA * numVecesVisitada
 	if (res==0 && !casillasAccesibles.empty()){
 		int fil, col;
-		int minVecesVisitada; 	// Número mínimo (hasta ahora) de veces visitada
+		int minPuntuacion;
 
 		// Minimo por el momento. La primera casilla accesible que sea CAMINO.
 		// No debo comprobar que sea accesible, ya lo he hecho antes
 		// No debo comprobar que sea un camino, porque no hay ni zapatillas ni puesto base
-		tie(fil, col) = aCoordenadas(sensores, casillasAccesibles[0]);
-		minVecesVisitada = numVecesVisitada[fil][col];
-		res = casillasAccesibles[0];
+		const int PESO_VISTA = 0.6; 		// Peso de la vista.
+		const int PESO_VISITADA = 1; 	// Peso de la visitada
+
+
+		tie(fil, col) = aCoordenadas(sensores, casillasAccesibles.at(0));
+		minPuntuacion = PESO_VISTA * numVecesVista.at(fil).at(col) + PESO_VISITADA * numVecesVisitada.at(fil).at(col);
+		res = casillasAccesibles.at(0);
 
 		// Buscamos la casilla con menor número de veces visitada
 		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
 			tie(fil, col) = aCoordenadas(sensores, *i);
-			if (numVecesVisitada[fil][col] < minVecesVisitada){
-				minVecesVisitada = numVecesVisitada[fil][col];
+			int puntuacion = PESO_VISTA * numVecesVista.at(fil).at(col) + PESO_VISITADA * numVecesVisitada.at(fil).at(col);
+			if (puntuacion < minPuntuacion){
+				minPuntuacion = puntuacion;
 				res = *i;
 			}
 		}
@@ -293,13 +305,14 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_0(Sensores sensores)
 
 	// Actualización de variables de estado.
 	situarSensorEnMapa(mapaResultado, mapaCotas, mapaEntidades, sensores);
-	if (sensores.superficie[0] == 'D')
+	if (sensores.superficie.at(0) == 'D')
 		tieneZapatillas = true;
-	numVecesVisitada[sensores.posF][sensores.posC]++;
+	if (lastAction == Action::WALK)
+		actualizarMatrices_VistasVisitadas(sensores);
 	
 
 	// Definición del comportamiento
-	if (sensores.superficie[0] == 'X')	// Llegó al puesto base
+	if (sensores.superficie.at(0) == 'X')	// Llegó al puesto base
 		action = Action::IDLE;
 	else if (num_TURN_SR_Restantes > 0){	// Está en su giro SL
 		action = Action::TURN_SR;
@@ -346,9 +359,10 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_1(Sensores sensores)
 
 	// Actualización de variables de estado.
 	situarSensorEnMapa(mapaResultado, mapaCotas, mapaEntidades, sensores);
-	if (sensores.superficie[0] == 'D')
+	if (sensores.superficie.at(0) == 'D')
 		tieneZapatillas = true;
-	numVecesVisitada[sensores.posF][sensores.posC]++;
+	if (lastAction == Action::WALK)
+		actualizarMatrices_VistasVisitadas(sensores);
 	
 
 	// Definición del comportamiento
