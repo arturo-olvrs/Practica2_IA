@@ -55,9 +55,8 @@ private:
    * @brief Método que determina la casilla más interesante a la que se puede mover el rescatador.
    * @param sensores  Estructura de datos que contiene la información de los sensores.
    * 
-   * @return  1 si debe moverse a la casilla 1 (TURN_SL)
-   *          2 si debe moverse a la casilla 2 (WALK)
-   *          3 si debe moverse a la casilla 3 (TURN_SR)
+   * @return  1-15: Debe moverse a la casilla correspondiente
+   *          -1,-2,-4,-5: Debe moverse a la casilla correspondiente del lateral
    *          0 si no ve ninguna casilla interesante. En ese caso, hará TURN_L
    */
   int veoCasillaInteresante(const Sensores & sensores);
@@ -77,11 +76,13 @@ private:
    * 
    * @param mResultado  Mapa de resultados del agente.
    * @param mCotas     Mapa de cotas del agente.
+   * @param mEntidades  Mapa de entidades del agente.
    * @param sensores   Estructura de datos que contiene la información de los sensores.
    */
   void situarSensorEnMapa(vector<vector<unsigned char>> &mResultado, 
-    vector<vector<unsigned char>> &mCotas,
-    Sensores sensores);
+                          vector<vector<unsigned char>> &mCotas,
+                          vector<vector<unsigned char>> &mEntidades,
+                          Sensores sensores);
   
   /**
    * @brief Método que reinicializa el mapa de veces visitadas.
@@ -92,16 +93,16 @@ private:
 
 
 
-/**
- * @brief Método que devuelve las coordenadas en el mapa de la casilla relativa a la posición del agente.
- * 
- * @param casillaRelativa  Número de la casilla relativa al agente.
- * @param sensores      Sensores del agente
- * 
- * @return  Un par de enteros que representan las coordenadas de la casilla en el mapa.
- *          El primer entero es la fila y el segundo entero es la columna.
- */
-pair<int, int> aCoordenadas(const Sensores& sensores, int casillaRelativa);
+  /**
+   * @brief Método que devuelve las coordenadas en el mapa de la casilla relativa a la posición del agente.
+   * 
+   * @param casillaRelativa  Número de la casilla relativa al agente.
+   * @param sensores      Sensores del agente
+   * 
+   * @return  Un par de enteros que representan las coordenadas de la casilla en el mapa.
+   *          El primer entero es la fila y el segundo entero es la columna.
+   */
+  pair<int, int> aCoordenadas(const Sensores& sensores, int casillaRelativa);
 
 };
 

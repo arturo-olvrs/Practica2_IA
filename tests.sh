@@ -46,6 +46,9 @@ tests_0=(
     "$ejecutable ./mapas/pruebaCiclo.map 0 0 13 3 6 5 12 6"               # Evitar Ciclos
     "$ejecutable ./mapas/pruebaDosUnicos_Zapas.map 0 0 24 10 2 17 17 0"   # Permitir ciclos si ha conseguido zapatillas
     "$ejecutable ./mapas/pruebaDosUnicos_Choque.map 0 0 16 9 2 16 14 6"   # Permitir ciclos si ha habido un choque
+    "$ejecutable ./mapas/pruebaDosUnicos_Choque.map 0 0 15 18 2 17 17 0"
+    "$ejecutable ./mapas/mapa75.map 0 0 8 5 2 17 17 0 3 3 0"
+    "$ejecutable ./mapas/mapa100.map 0 0 70 38 6 79 91 1 0 3 3 0"
 )
 tests_1=(
     "$ejecutable ./mapas/mapa30.map 0 1 6 3 0 21 15 2"
