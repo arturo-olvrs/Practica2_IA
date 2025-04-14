@@ -103,6 +103,13 @@ pair<int, int> ComportamientoAuxiliar::aCoordenadas(const Sensores& sensores, in
 		diffDcha = casillaRelativa - casillaCentralFila;
 	}
 
+	cout << "PosActual" << sensores.posF << "," << sensores.posC << endl;
+	cout << "PosRelativa" << casillaRelativa << endl;
+	cout << "Rumbo" << sensores.rumbo << endl;
+	cout << "DiffDelante" << diffDelante << endl;
+	cout << "DiffDcha" << diffDcha << endl;
+
+
 
 	switch (sensores.rumbo)
 	{
@@ -153,6 +160,9 @@ pair<int, int> ComportamientoAuxiliar::aCoordenadas(const Sensores& sensores, in
 		}
 		break;
 	}
+
+	cout << "PosFinal" << fil << "," << col << endl;
+	cout << "------------------------" << endl;
 
 	return make_pair(fil, col);
 }
@@ -219,6 +229,15 @@ int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 	const vector<int> casillasAlcanzables	= {2,3,1, -4, -2};
 	vector<int> casillasAccesibles;
 	int fil,col;
+	#define DEBUG 0
+
+	#ifdef DEBUG
+	cout << "Casillas alcanzables: " << endl;
+	for (auto i = casillasAlcanzables.begin(); i != casillasAlcanzables.end(); ++i){
+		tie(fil,col)=aCoordenadas(sensores, *i);
+		cout << "(" << fil << "," << col << ") " << mapaResultado.at(fil).at(col) << " " << *i << endl;
+	}
+	#endif
 
 
 	for (auto i = casillasAlcanzables.begin(); i != casillasAlcanzables.end(); ++i){
@@ -229,7 +248,6 @@ int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 				casillasAccesibles.push_back(*i);
 		}
 	}
-
 	#ifdef DEBUG
 	cout << "Casillas accesibles: " << endl;
 	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
