@@ -116,12 +116,12 @@ bool actuacionRescatador(unsigned char celdaJ_inicial, unsigned char celdaJ_fin,
       monitor.get_entidad(0)->seAostio();
       if (monitor.get_entidad(monitor.getMapa()->casillaOcupada(0))->getSubTipo() == excursionista)
       {
-        monitor.get_entidad(0)->perderPV(1);
+        monitor.get_entidad(0)->perderPV(0);
         std::cout << "El Rescatador ha chocado con un excursionista\n";
       }
       else if (monitor.get_entidad(monitor.getMapa()->casillaOcupada(0))->getSubTipo() == auxiliar)
       {
-        monitor.get_entidad(0)->perderPV(1);
+        monitor.get_entidad(0)->perderPV(0);
         std::cout << "El Rescatador ha chocado con un auxiliar\n";
       }
       else if (monitor.get_entidad(monitor.getMapa()->casillaOcupada(0))->getSubTipo() == vandalo)
@@ -142,7 +142,7 @@ bool actuacionRescatador(unsigned char celdaJ_inicial, unsigned char celdaJ_fin,
         monitor.get_entidad(0)->Cogio_Zapatillas(false);*/
 
         // Opcion simplemente choca contra el vandalo
-        monitor.get_entidad(0)->perderPV(1);
+        monitor.get_entidad(0)->perderPV(0);
         std::cout << "El Rescatador ha chocado con un vandalo\n";
       }
       salida = false;
@@ -495,12 +495,12 @@ bool actuacionAuxiliar(unsigned char celdaJ_inicial, unsigned char celdaJ_fin, i
       monitor.get_entidad(1)->seAostio();
       if (monitor.get_entidad(monitor.getMapa()->casillaOcupada(1))->getSubTipo() == excursionista)
       {
-        monitor.get_entidad(1)->perderPV(1);
+        monitor.get_entidad(1)->perderPV(0);
         std::cout << "El auxiliar ha chocado con un excursionista\n";
       }
       else if (monitor.get_entidad(monitor.getMapa()->casillaOcupada(1))->getTipo() == jugador)
       {
-        monitor.get_entidad(1)->perderPV(1);
+        monitor.get_entidad(1)->perderPV(0);
         std::cout << "El auxiliar ha chocado con el rescatador\n";
       }
       else if (monitor.get_entidad(monitor.getMapa()->casillaOcupada(1))->getSubTipo() == vandalo)
@@ -521,7 +521,7 @@ bool actuacionAuxiliar(unsigned char celdaJ_inicial, unsigned char celdaJ_fin, i
         monitor.get_entidad(1)->Cogio_Zapatillas(false);*/
 
         // Opcion simplemente choca contra el vandalo
-        monitor.get_entidad(1)->perderPV(1);
+        monitor.get_entidad(1)->perderPV(0);
         std::cout << "El auxiliar ha chocado con un vandalo\n";
       }
       salida = false;
@@ -809,7 +809,7 @@ void nucleo_motor_juego(MonitorJuego &monitor, int acc)
   }
   else
   {
-    monitor.get_entidad(0)->perderPV(1);
+    monitor.get_entidad(0)->perderPV(0);
   }
 
   for (unsigned int i = 1; i < monitor.numero_entidades(); i++)
