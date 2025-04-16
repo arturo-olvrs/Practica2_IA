@@ -276,6 +276,7 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		// Para llegar a casillasAlcanzablesIndirectas.at(i), ha de pasar por casillasAccesibleDirectas.at(i)
 		int casillaIntermedia 	= casillasAlcanzablesDirectas.at(i);
 		int casillaFinal 		= casillasAlcanzablesIndirectas.at(i);
+
 		if (casillaAccesible(sensores, casillaIntermedia) && casillaAccesible(sensores, casillaFinal)){
 
 			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
@@ -320,14 +321,6 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 				casillasAccesibles.push_back(*i);
 		}
 	}
-
-	#ifdef DEBUG_RESC
-	cout << "Casillas accesibles: " << endl;
-	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
-		tie(fil,col)=aCoordenadas(sensores, *i);
-		cout << "(" << fil << "," << col << ") " << mapaResultado.at(fil).at(col) << " " << *i << endl;
-	}
-	#endif
 
 
 
@@ -374,24 +367,12 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
 			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
 			double puntuacion = PESO_VISTA * numVecesVista.at(fil).at(col) + PESO_VISITADA * numVecesVisitada.at(fil).at(col);
-			#ifdef DEBUG_RESC
-			cout << "Casilla: " << *i << endl;
-			cout << "\t - fila: " << fil << endl;
-			cout << "\t - col: " << col << endl;
-			cout << "\t - numVecesVista: " << numVecesVista.at(fil).at(col) << endl;
-			cout << "\t - numVecesVisitada: " << numVecesVisitada.at(fil).at(col) << endl;
-			cout << "\t - puntuacion: " << puntuacion << endl;
-			#endif
 			if (puntuacion < minPuntuacion){
 				minPuntuacion = puntuacion;
 				res = *i;
 			}
 		}
 	}
-
-	#ifdef DEBUG_RESC
-	cout << "Casilla más interesante: " << res << endl;
-	#endif
 
 	return res;
 }
@@ -552,9 +533,10 @@ Estado ComportamientoRescatador::ejecutarAccion(Action action, const Estado & in
 
 
 
-void ComportamientoRescatador::Dijkstra(const Estado& origen, 
-	vector<vector<vector<int>>> &gastoEnergia, 
-	vector<vector<vector<Predecesor>>> &predecesores)
+list<Action> ComportamientoRescatador::Dijkstra(
+	const Estado &origen,
+	int filDestino,
+	int colDestino)
 {
 
 	// Acciones posibles del agente
@@ -562,100 +544,86 @@ void ComportamientoRescatador::Dijkstra(const Estado& origen,
 
 	const int INVALID = -1;	// Como no hay un valor máximo, ponemos un valor imposible
 	
-	// Inicializamos las matrices de Dijkstra
-	gastoEnergia.clear();
-	gastoEnergia.resize(mapaResultado.size(), vector<vector<int>>(mapaResultado.at(0).size(), vector<int>(8, INVALID)));
-
-
-	predecesores.clear();
-	predecesores.resize(mapaResultado.size(), vector<vector<Predecesor>>(mapaResultado.at(0).size(), vector<Predecesor>(8, {INVALID, INVALID, INVALID, {}})));
-
-
-	// Inicializamos el nodo origen
-	gastoEnergia.at(origen.fil).at(origen.col).at(origen.orientacion) = 0;	// Gasto de energía al nodo origen
-	predecesores.at(origen.fil).at(origen.col).at(origen.orientacion) = {origen.fil, origen.col, origen.orientacion, {}};
-
 
 	// Cola con prioridad formada por Nodos. Ordenada por el gasto de Energia al nodo Origen
-	priority_queue<Nodo, vector<Nodo>, greater<>> frontera;
+	struct Comparador {
+		bool operator()(const Nodo& a, const Nodo& b) {
+			// Retorna true si a tiene más energía que b,
+			// así el de menor energía queda al tope
+			return a.gastoEnergia > b.gastoEnergia;
+		}
+	};
+
+	priority_queue<Nodo, vector<Nodo>, Comparador> frontera;
 
 	// Nodos ya visitados, para evitar repeticiones
-	set<Estado> visitados;
+	set<Nodo> visitados;
 
 
 	Nodo nodoActual = {origen, 0, {}};	// Nodo origen
 	frontera.push(nodoActual);
-	while(!frontera.empty()){
+
+	#define DEBUG_DIJKSTRA
+
+	#ifdef DEBUG_DIJKSTRA
+		int interaciones = 0;
+	#endif
+
+
+
+
+	bool caminoOptimoEncontrado = false;
+	while(!frontera.empty() && !caminoOptimoEncontrado){
+
 		nodoActual = frontera.top();
 		frontera.pop();
+
+		// Comprobamos si el nodo actual es el destino
+		caminoOptimoEncontrado = (nodoActual.estado.fil == filDestino && nodoActual.estado.col == colDestino);
 		
-		if (visitados.insert(nodoActual.estado).second){
+		if (!caminoOptimoEncontrado && visitados.insert(nodoActual).second){
+
+			#ifdef DEBUG_DIJKSTRA
+				interaciones++;
+			#endif
 
 			// Comprobamos si hemos conseguido Zapatillas
 			if (mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == 'D')
 				nodoActual.estado.tieneZapatillas = true;
 
 			// Exploramos los nodos resultantes de aplicar cada una de las acciones
-			Action accion;
 			Nodo nuevoNodo;
-
-			#ifdef DEBUG_RESC_DIJK
-			cout << "-------------------------------------------------------"
-				<< "\nEstado actual: " << nodoActual.estado.fil << "," << nodoActual.estado.col << " "
-				<< "Orientacion: " << nodoActual.estado.orientacion << endl;
-			#endif
 
 
 			for (auto it = acciones.begin(); it != acciones.end(); ++it){
-				accion = *it;
-				nuevoNodo.estado = ejecutarAccion(accion, nodoActual.estado);
-				if (visitados.find(nuevoNodo.estado) == visitados.end()){
+				nuevoNodo.estado = ejecutarAccion(*it, nodoActual.estado);
 
-					#ifdef DEBUG_RESC_DIJK
-					cout << "Nodo Expandido " << nuevoNodo.estado.fil << "," << nuevoNodo.estado.col << " "
-						<< "Orientacion: " << nuevoNodo.estado.orientacion << "(" << accion << ")" << endl;
-					#endif
-					// No se ha explorado, hay que explorarlo.
-
+				// Comprobamos que se ha generado un nodo nuevo
+				if (visitados.find(nuevoNodo) == visitados.end()){
 
 					// Modificamos el gasto de energía del nuevo nodo
-					nuevoNodo.gastoEnergia = nodoActual.gastoEnergia + 1;	// TODO: Cambiar. Por ahora, cada acción gasta 1 de energía
+					nuevoNodo.gastoEnergia = nodoActual.gastoEnergia + gastoAccion(*it, nodoActual.estado.fil, nodoActual.estado.col, nuevoNodo.estado.fil, nuevoNodo.estado.col);
 					nuevoNodo.acciones = nodoActual.acciones;
-					nuevoNodo.acciones.push_back(accion);
+					nuevoNodo.acciones.push_back(*it);
 					
-					if (gastoEnergia.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion) == INVALID
-						|| nuevoNodo.gastoEnergia < gastoEnergia.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion)){
 
-						// Actualizamos las matrices de Dijkstra
-						gastoEnergia.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion) = nuevoNodo.gastoEnergia;
-						predecesores.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion).fil = nodoActual.estado.fil;
-						predecesores.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion).col = nodoActual.estado.col;
-						predecesores.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion).orientacion = nodoActual.estado.orientacion;
-						predecesores.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion).acciones = nuevoNodo.acciones;
-
-						cout << "Actualizamos!!!" << endl;
-						#ifdef DEBUG_RESC_DIJK
-						cout << "Gasto energia: " << nuevoNodo.gastoEnergia << endl;
-						cout << "Predecesor: " << nodoActual.estado.fil << "," << nodoActual.estado.col << " "
-							<< "Orientacion: " << nodoActual.estado.orientacion << endl;
-						cout << "Acciones: ";
-						for (auto it = nuevoNodo.acciones.begin(); it != nuevoNodo.acciones.end(); ++it)
-							cout << *it << " ";
-						cout << endl;
-						#endif
-
-						// Reseteamos las acciones; ya han quedado grabadas
-						nuevoNodo.acciones.clear();
-					}
-
-
-
-					// Añadimos el nuevo nodo a la frontera (podrá estar ya)
+					// Añadimos el nuevo nodo a la frontera (podrá estar ya, pero podemos haber encontrado un camino mejor)
 					frontera.push(nuevoNodo);
 				} 
 			} // for accion
 		} // if visitados.insert
 	} // while frontera
+
+	// Si hemos encontrado el camino óptimo, lo devolvemos
+	list<Action> plan = caminoOptimoEncontrado ? nodoActual.acciones : list<Action>();
+
+	#ifdef DEBUG_DIJKSTRA
+		cout << "Iteraciones: " << interaciones << endl;
+		cout << "Nodos abiertos: " << frontera.size() << endl;
+		cout << "Nodos cerrados: " << visitados.size() << endl;
+	#endif
+		
+	return plan;
 
 }
 
@@ -680,6 +648,94 @@ void ComportamientoRescatador::VisualizaPlan(const Estado& origen, const list<Ac
 }
 
 
+int ComportamientoRescatador::gastoAccion(Action action, int filInicio, int colInicio, int filDestino, int colDestino){
+	int gasto=0;
+	int difAltura = mapaCotas.at(filDestino).at(colDestino) - mapaCotas.at(filInicio).at(colInicio);
+	if (difAltura > 0)
+		difAltura = 1;
+	else if (difAltura < 0)
+		difAltura = -1;
+	// difAltura == 0 ya está correcto
+
+	switch (action){
+		case Action::WALK:
+			switch (mapaResultado.at(filInicio).at(colInicio)){
+				case 'A':
+					gasto = 100;
+					gasto += difAltura * 10;
+					break;
+				case 'T':
+					gasto = 20;
+					gasto += difAltura * 5;
+					break;
+				case 'S':
+					gasto = 2;
+					gasto += difAltura * 1;
+					break;
+				default:
+					gasto = 1;
+					gasto += difAltura * 0;
+					break;
+			}
+			break;
+		case Action::RUN:
+			switch (mapaResultado.at(filInicio).at(colInicio)){
+				case 'A':
+					gasto = 150;
+					gasto += difAltura * 15;
+					break;
+				case 'T':
+					gasto = 35;
+					gasto += difAltura * 5;
+					break;
+				case 'S':
+					gasto = 3;
+					gasto += difAltura * 2;
+					break;
+				default:
+					gasto = 1;
+					gasto += difAltura * 0;
+					break;
+			}
+			break;
+		case Action::TURN_L:
+			switch (mapaResultado.at(filInicio).at(colInicio)){
+				case 'A':
+					gasto = 30;
+					break;
+				case 'T':
+					gasto = 5;
+					break;
+				case 'S':
+					gasto = 1;
+					break;
+				default:
+					gasto = 1;
+					break;
+			}
+			break;
+		case Action::TURN_SR:
+			switch (mapaResultado.at(filInicio).at(colInicio)){
+				case 'A':
+					gasto = 16;
+					break;
+				case 'T':
+					gasto = 3;
+					break;
+				case 'S':
+					gasto = 1;
+					break;
+				default:
+					gasto = 1;
+					break;
+			}
+			break;
+	}	
+	
+	return gasto;
+}
+
+
 
 Action ComportamientoRescatador::ComportamientoRescatadorNivel_2(Sensores sensores)
 {
@@ -694,69 +750,8 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_2(Sensores sensor
 		origen.orientacion = sensores.rumbo;
 		origen.tieneZapatillas = tieneZapatillas;
 
-		// Inicializamos las matrices de Dijkstra
-		vector<vector<vector<int>>> gastoEnergia;
-		vector<vector<vector<Predecesor>>> predecesores;
-		Dijkstra(origen, gastoEnergia, predecesores);
-
-
-		int filObjetivo = sensores.destinoF;
-		int colObjetivo = sensores.destinoC;
-		int orientacionObjetivo;
-
-		// Para saber la direcciób objetivo, de entre las 8 posibles nos quedamos la que tenga menor gasto de energía
-		int minEnergia = gastoEnergia.at(filObjetivo).at(colObjetivo).at(0);
-		orientacionObjetivo = (Orientacion)0;
-		for (int i=1; i<8; ++i){
-			if (gastoEnergia.at(filObjetivo).at(colObjetivo).at(i) < minEnergia){
-				minEnergia = gastoEnergia.at(filObjetivo).at(colObjetivo).at(i);
-				orientacionObjetivo= (Orientacion)i;
-			}
-		}
-
-		cout << "Estado origen: " << origen.fil << "," << origen.col << " "
-			<< "Orientacion: " << origen.orientacion << endl;
-		cout << "Estado objetivo: " << filObjetivo << "," << colObjetivo << " "
-			<< "Orientacion: " << orientacionObjetivo << endl;
-		cout << "Gasto energia: " << minEnergia << endl;
-	
-
-
-		// Vamos añadiendo hasta que encontremos la que solo tiene IDLE
-		while (filObjetivo != origen.fil || colObjetivo != origen.col){
-			plan.insert(plan.begin(),
-						predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).acciones.begin(),
-						predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).acciones.end());
-
-			int filPredecesor = predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).fil;
-			int colPredecesor = predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).col;
-			int orientacionPredecesor = predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).orientacion;
-
-			#define DEBUG_RESC_DIJKSTRA 0
-			#ifdef DEBUG_RESC_DIJKSTRA
-			cout << "Casilla " << filObjetivo << "," << colObjetivo << " " << orientacionObjetivo << " "
-				<< "Gasto energia: " << gastoEnergia.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo) << endl;
-			cout << "Predecesor: " << filPredecesor << "," << colPredecesor << " "
-				<< "Orientacion: " << orientacionPredecesor << endl;
-			cout << "Acciones: ";
-			for (auto it = predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).acciones.begin(); it != predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).acciones.end(); ++it){
-				cout << *it << " ";
-			}
-			cout << endl;
-			cout << "------------------------" << endl;
-			#endif
-
-			filObjetivo = filPredecesor;
-			colObjetivo = colPredecesor;
-			orientacionObjetivo = orientacionPredecesor;
-
-		}
-		cout << "Plan encontrado " << plan.size() << endl;
-		// Imprimimos el plan
-		for (auto it = plan.begin(); it != plan.end(); ++it){
-			cout << *it << " ";
-		}
-		cout << endl;
+		
+		plan = Dijkstra(origen, sensores.destinoF, sensores.destinoC);
 
 		VisualizaPlan(origen, plan);
 	}
@@ -771,8 +766,12 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_2(Sensores sensor
 
 Action ComportamientoRescatador::ComportamientoRescatadorNivel_3(Sensores sensores)
 {
+	Action accion= IDLE;
+	return accion;
 }
 
 Action ComportamientoRescatador::ComportamientoRescatadorNivel_4(Sensores sensores)
 {
+	Action accion= IDLE;
+	return accion;
 }

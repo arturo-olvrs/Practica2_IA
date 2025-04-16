@@ -46,25 +46,15 @@ struct Estado{
 struct Nodo{
   Estado estado;	// Estado del nodo
   int gastoEnergia;	// Gasto de energía al nodo
-  list<Action> acciones;	// Acciones que se han realizado para llegar al nodo desde su predecesor
+  list<Action> acciones;	// Acciones que se han realizado para llegar al nodo
 
-  bool operator>(const Nodo & otro) const {
-    return gastoEnergia > otro.gastoEnergia;
+  bool operator<(const Nodo & otro) const {
+    return estado < otro.estado;
   }
 
   bool operator==(const Nodo & otro) const {
     return estado == otro.estado;
   }
-};
-
-/**
- * @brief Struct para recuperar el camino de Dijkstra.
- */
-struct Predecesor{
-  int fil;		// Fila del predecesor
-  int col;		// Columna del predecesor
-  int orientacion;	// Orientación del predecesor
-  list<Action> acciones;	// Acciones que se han realizado para llegar desde el predecesor al nodo
 };
 
 
@@ -216,11 +206,28 @@ private:
   /**
    * @brief Método que implementa el algoritmo de Dijkstra para encontrar el camino más corto.
    * 
-   * @param origen  Nodo de origen.
-   * @param gastoEnergia  Matriz que contiene el gasto de energía desde el origen a cada nodo.
-   * @param predecesores  Matriz que contiene los predecesores de cada nodo.
+   * @param origen  Estado de origen.
+   * @param filDestino  Fila de la casilla destino.
+   * @param colDestino  Columna de la casilla destino.
+   * 
+   * @return  Lista de acciones a seguir para llegar al destino.
    */
-  void Dijkstra(const Estado& origen, vector<vector<vector<int>>> &gastoEnergia, vector<vector<vector<Predecesor>>> &predecesores);
+  list<Action> Dijkstra(const Estado& origen, int filDestino, int colDestino);
+  
+  /**
+   * @brief Método que calcula el gasto de energía al realizar una acción.
+   * 
+   * @param action  Acción a realizar.
+   * @param filInicio  Fila de la casilla inicial.
+   * @param colInicio  Columna de la casilla inicial.
+   * @param filDestino  Fila de la casilla destino.
+   * @param colDestino  Columna de la casilla destino.
+   * 
+   * @return  Gasto de energía al realizar la acción.
+   * 
+   * @pre La acción es válida
+   */
+  int gastoAccion(Action action, int filInicio, int colInicio, int filDestino, int colDestino);
 
   /**
    * @brief Método que visualiza el plan de acciones a seguir.
