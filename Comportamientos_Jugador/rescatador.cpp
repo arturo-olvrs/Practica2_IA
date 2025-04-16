@@ -4,8 +4,18 @@
 #include <vector>
 #include <algorithm>
 #include <map>
+#include <unordered_set>
+#include <list>
+#include <set>
+#include <queue>
 
 #include <iostream>
+
+// Inicializamos el conjunto de casillas no transitables
+const unordered_set<char> ComportamientoRescatador::CASILLAS_NO_TRANSITABLES = {'P', 'M', 'B'};
+
+
+
 
 Action ComportamientoRescatador::think(Sensores sensores)
 {
@@ -20,7 +30,7 @@ Action ComportamientoRescatador::think(Sensores sensores)
 		accion = ComportamientoRescatadorNivel_1 (sensores);
 		break;
 	case 2:
-		// accion = ComportamientoRescatadorNivel_2 (sensores);
+		accion = ComportamientoRescatadorNivel_2 (sensores);
 		break;
 	case 3:
 		// accion = ComportamientoRescatadorNivel_3 (sensores);
@@ -41,7 +51,7 @@ int ComportamientoRescatador::interact(Action accion, int valor)
 
 
 
-pair<int, int> ComportamientoRescatador::aCoordenadas(const Sensores& sensores, int casillaRelativa)
+pair<int, int> ComportamientoRescatador::aCoordenadas(int filAgente, int colAgente, Orientacion orientacion, int casillaRelativa)
 {
 
 
@@ -62,7 +72,7 @@ pair<int, int> ComportamientoRescatador::aCoordenadas(const Sensores& sensores, 
 	};
 
 
-	switch (sensores.rumbo)
+	switch (orientacion)
 	{
 	case norte:
 	case noreste:
@@ -107,7 +117,7 @@ pair<int, int> ComportamientoRescatador::aCoordenadas(const Sensores& sensores, 
 	}
 
 
-	switch (sensores.rumbo)
+	switch (orientacion)
 	{
 	case norte:
 	case sur:
@@ -116,11 +126,11 @@ pair<int, int> ComportamientoRescatador::aCoordenadas(const Sensores& sensores, 
 		varDelante 	= numDelante * diffDelante;	
 		varDcha 	= numDcha * diffDcha;				
 		if (rumboHorizontal){
-			fil 	= sensores.posF + varDcha;
-			col = sensores.posC + varDelante;
+			fil 	= filAgente+ varDcha;
+			col = colAgente + varDelante;
 		}else{
-			fil 	= sensores.posF + varDelante;
-			col = sensores.posC + varDcha;
+			fil 	= filAgente + varDelante;
+			col = colAgente + varDcha;
 		}
 		break;
 	
@@ -133,25 +143,33 @@ pair<int, int> ComportamientoRescatador::aCoordenadas(const Sensores& sensores, 
 			if (rumboHorizontal){
 				varDcha		= numDelante * (diffDcha+diffDelante);
 				varDelante 	= numDcha * diffDelante;
-				fil 		= sensores.posF + varDcha;
-				col = sensores.posC + varDelante;
+				if (diffDelante == 0)
+					varDelante = -varDcha;
+				fil 		= filAgente + varDcha;
+				col = colAgente + varDelante;
 			}else{
 				varDelante 	= numDelante * diffDelante;
 				varDcha 	= numDcha * (diffDcha+diffDelante);
-				fil 		= sensores.posF + varDelante;
-				col = sensores.posC + varDcha;
+				if (diffDelante == 0)
+					varDelante = varDcha;
+				fil 		= filAgente + varDelante;
+				col = colAgente + varDcha;
 			}
 		}else{
 			if (rumboHorizontal){
 				varDelante 	= numDelante * diffDelante;
 				varDcha 	= numDcha * (diffDelante-diffDcha);
-				fil 		= sensores.posF + varDelante;
-				col = sensores.posC + varDcha;
+				if (diffDelante == 0)
+					varDelante = -varDcha;
+				fil 		= filAgente + varDelante;
+				col = colAgente + varDcha;
 			}else{
 				varDcha		= numDelante * (diffDelante-diffDcha);
 				varDelante 	= numDcha * diffDelante;
-				fil 		= sensores.posF + varDcha;
-				col = sensores.posC + varDelante;
+				if (diffDelante == 0)
+					varDelante = varDcha;
+				fil 		= filAgente + varDcha;
+				col = colAgente + varDelante;
 			}
 		}
 		break;
@@ -170,7 +188,7 @@ void ComportamientoRescatador::situarSensorEnMapa(
 {	
 	for (int i=0; i<NUM_CASILLAS; ++i){
 		int fil, col;
-		tie(fil, col) = aCoordenadas(sensores, i);
+		tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
 		
 		mResultado.at(fil).at(col) = sensores.superficie.at(i);
 		mCotas.at(fil).at(col) = sensores.cota.at(i);
@@ -178,8 +196,7 @@ void ComportamientoRescatador::situarSensorEnMapa(
 	}
 }
 
-void ComportamientoRescatador::reinicializarVeces_VistaVisitada()
-{
+void ComportamientoRescatador::reinicializarVeces_VistaVisitada(){
 	// Reinicializamos el mapa de veces visitadas
 	for (int i=0; i<mapaResultado.size(); ++i){
 		for (int j=0; j<mapaResultado.at(i).size(); ++j){
@@ -193,25 +210,41 @@ void ComportamientoRescatador::actualizarMatrices_VistasVisitadas(const Sensores
 	numVecesVisitada.at(sensores.posF).at(sensores.posC)++;
 	for (int i=0; i<NUM_CASILLAS; ++i){
 		int fil, col;
-		tie(fil, col) = aCoordenadas(sensores, i);
+		tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
 		numVecesVista.at(fil).at(col)++;
 	}
 }
 
-bool ComportamientoRescatador::casillaAccesible(const Sensores & sensores, int casilla)
+bool ComportamientoRescatador::casillaAccesible(const Estado& estado, int casilla)
+{
+	return casillaAccesible(estado.fil, estado.col, estado.orientacion, estado.tieneZapatillas, false, casilla);
+}
+
+bool ComportamientoRescatador::casillaAccesible(const Sensores& sensores, int casilla)
+{
+	return casillaAccesible(sensores.posF, sensores.posC, sensores.rumbo, tieneZapatillas, true, casilla);
+}
+
+bool ComportamientoRescatador::casillaAccesible(int filAgente, int colAgente, Orientacion orientacion, bool conZapatillas, bool comprobarAgentes, int casilla)
 {
 	// Comprobamos si la casilla es accesible o no. Será accesible si:
 	// 1. No es un precipicio
 	// 2. La diferencia de altura entre la casilla y la cota del rescatador es <= 1
 	// 3. Si el rescatador tiene zapatillas, la diferencia de altura puede ser <= 2
 	int fil, col;
-	tie(fil, col) = aCoordenadas(sensores, casilla);
+	tie(fil, col) = aCoordenadas(filAgente, colAgente, orientacion, casilla);
 
-	// Esta línea se asegura de que alguna vez la ha visto
-	bool accesible = mapaEntidades.at(fil).at(col) == '_'; // No hay agentes en la casilla
+	bool accesible = true;
 	
-	int dif = abs(mapaCotas.at(sensores.posF).at(sensores.posC) - mapaCotas.at(fil).at(col));
-	accesible &= (mapaResultado.at(fil).at(col) != 'P') && (dif<=1 || (tieneZapatillas && dif <=2));
+	if (comprobarAgentes)
+		// Esta línea se asegura de que alguna vez la ha visto
+		accesible &= mapaEntidades.at(fil).at(col) == '_'; // No hay agentes en la casilla
+	
+	// Comprobamos que es transitable
+	accesible &= CASILLAS_NO_TRANSITABLES.find(mapaResultado.at(fil).at(col)) == CASILLAS_NO_TRANSITABLES.end();
+	
+	int dif = abs(mapaCotas.at(filAgente).at(colAgente) - mapaCotas.at(fil).at(col));
+	accesible &= (dif<=1 || (conZapatillas && dif <=2));
 
 	return accesible;
 }
@@ -245,21 +278,17 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		int casillaFinal 		= casillasAlcanzablesIndirectas.at(i);
 		if (casillaAccesible(sensores, casillaIntermedia) && casillaAccesible(sensores, casillaFinal)){
 
-			tie(fil,col) = aCoordenadas(sensores, casillaFinal);
-			bool ambasPermitidas = 	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
+			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
+			bool finalPermitida =	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
 
-			if (ambasPermitidas){
-				tie(fil,col) = aCoordenadas(sensores, casillaIntermedia);
-				ambasPermitidas = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
-			}
-
-			if (ambasPermitidas)
+			// La intermedia no se pisa.
+			if (finalPermitida)
 				casillasAccesibles.push_back(casillaFinal);
 		}
 	}
 	for (auto i = casillasAlcanzablesDirectas.begin(); i != casillasAlcanzablesDirectas.end(); ++i){
 		if (casillaAccesible(sensores, *i)){
-			tie(fil,col)=aCoordenadas(sensores, *i);
+			tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
 			bool permitida = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
 			if (permitida)
 				casillasAccesibles.push_back(*i);
@@ -275,28 +304,24 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		int casillaFinal 		= casillasAlcanzablesIndirectas_Atras.at(i);
 		if (casillaAccesible(sensores, casillaIntermedia) && casillaAccesible(sensores, casillaFinal)){
 
-			tie(fil,col) = aCoordenadas(sensores, casillaFinal);
-			bool ambasPermitidas = 	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
+			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
+			bool finalPermitida =	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
 
-			if (ambasPermitidas){
-				tie(fil,col) = aCoordenadas(sensores, casillaIntermedia);
-				ambasPermitidas = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
-			}
-
-			if (ambasPermitidas)
+			// La intermedia no se pisa.
+			if (finalPermitida)
 				casillasAccesibles.push_back(casillaFinal);
 		}
 	}
 	for (auto i = casillasAlcanzablesDirectas_Atras.begin(); i != casillasAlcanzablesDirectas_Atras.end(); ++i){
 		if (casillaAccesible(sensores, *i)){
-			tie(fil,col)=aCoordenadas(sensores, *i);
+			tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
 			bool permitida = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
 			if (permitida)
 				casillasAccesibles.push_back(*i);
 		}
 	}
 
-	#ifdef DEBUG
+	#ifdef DEBUG_RESC
 	cout << "Casillas accesibles: " << endl;
 	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
 		tie(fil,col)=aCoordenadas(sensores, *i);
@@ -312,7 +337,7 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 	// Buscamos primero el puesto base
 	if (sensores.nivel == 0){
 		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
-			tie(fil, col) = aCoordenadas(sensores, *i);
+			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
 			if (mapaResultado.at(fil).at(col) == 'X')
 				res = *i;
 		}
@@ -321,7 +346,7 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 	// Si no hay puesto base, miro si hay zapatillas
 	if (!tieneZapatillas){
 		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
-			tie(fil, col) = aCoordenadas(sensores, *i);
+			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
 			if (mapaResultado.at(fil).at(col) == 'D')
 				res = *i;
 		}
@@ -332,23 +357,31 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 	// Criterio: menor valor de: PESO_VISTA * numVecesVista + PESO_VISITADA * numVecesVisitada
 	if (res==0 && !casillasAccesibles.empty()){
 		int fil, col;
-		int minPuntuacion;
+		double minPuntuacion;
 
 		// Minimo por el momento. La primera casilla accesible que sea CAMINO.
 		// No debo comprobar que sea accesible, ya lo he hecho antes
 		// No debo comprobar que sea un camino, porque no hay ni zapatillas ni puesto base
-		const int PESO_VISTA = 0.6; 		// Peso de la vista.
-		const int PESO_VISITADA = 1; 	// Peso de la visitada
+		const double PESO_VISTA = 0.6; 		// Peso de la vista.
+		const double PESO_VISITADA = 1; 	// Peso de la visitada
 
 
-		tie(fil, col) = aCoordenadas(sensores, casillasAccesibles.at(0));
+		tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, casillasAccesibles.at(0));
 		minPuntuacion = PESO_VISTA * numVecesVista.at(fil).at(col) + PESO_VISITADA * numVecesVisitada.at(fil).at(col);
 		res = casillasAccesibles.at(0);
 
 		// Buscamos la casilla con menor número de veces visitada
 		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
-			tie(fil, col) = aCoordenadas(sensores, *i);
-			int puntuacion = PESO_VISTA * numVecesVista.at(fil).at(col) + PESO_VISITADA * numVecesVisitada.at(fil).at(col);
+			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+			double puntuacion = PESO_VISTA * numVecesVista.at(fil).at(col) + PESO_VISITADA * numVecesVisitada.at(fil).at(col);
+			#ifdef DEBUG_RESC
+			cout << "Casilla: " << *i << endl;
+			cout << "\t - fila: " << fil << endl;
+			cout << "\t - col: " << col << endl;
+			cout << "\t - numVecesVista: " << numVecesVista.at(fil).at(col) << endl;
+			cout << "\t - numVecesVisitada: " << numVecesVisitada.at(fil).at(col) << endl;
+			cout << "\t - puntuacion: " << puntuacion << endl;
+			#endif
 			if (puntuacion < minPuntuacion){
 				minPuntuacion = puntuacion;
 				res = *i;
@@ -356,7 +389,7 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		}
 	}
 
-	#ifdef DEBUG
+	#ifdef DEBUG_RESC
 	cout << "Casilla más interesante: " << res << endl;
 	#endif
 
@@ -373,7 +406,7 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_0(Sensores sensor
 
 	// Actualización de variables de estado.
 	situarSensorEnMapa(mapaResultado, mapaCotas, mapaEntidades, sensores);
-	if (sensores.superficie.at(0) == 'D'){
+	if (!tieneZapatillas && sensores.superficie.at(0) == 'D'){
 		tieneZapatillas = true;
 		reinicializarVeces_VistaVisitada();
 	}
@@ -438,7 +471,7 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_1(Sensores sensor
 
 	// Actualización de variables de estado.
 	situarSensorEnMapa(mapaResultado, mapaCotas, mapaEntidades, sensores);
-	if (sensores.superficie.at(0) == 'D'){
+	if (!tieneZapatillas && sensores.superficie.at(0) == 'D'){
 		tieneZapatillas = true;
 		reinicializarVeces_VistaVisitada();
 	}
@@ -493,8 +526,247 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_1(Sensores sensor
 	return action;
 }
 
+// -----------------------------------------------------------------------------
+
+Estado ComportamientoRescatador::ejecutarAccion(Action action, const Estado & inicio){
+
+	Estado nuevoEstado = inicio;
+	switch (action){
+		case Action::RUN:
+			if (casillaAccesible(inicio, 2) && casillaAccesible(inicio, 6))
+				tie(nuevoEstado.fil, nuevoEstado.col) = aCoordenadas(inicio.fil, inicio.col, inicio.orientacion, 6);
+			break;
+		case Action::TURN_SR:
+			nuevoEstado.orientacion = (Orientacion)(((int)inicio.orientacion + 1) % 8);
+			break;
+		case Action::TURN_L:
+			nuevoEstado.orientacion = (Orientacion)((8+(int)inicio.orientacion - 2) % 8);
+			break;
+		case Action::WALK:
+			if (casillaAccesible(inicio, 2))
+				tie(nuevoEstado.fil, nuevoEstado.col) = aCoordenadas(inicio.fil, inicio.col, inicio.orientacion, 2);
+			break;
+	}
+	return nuevoEstado;
+}
+
+
+
+void ComportamientoRescatador::Dijkstra(const Estado& origen, 
+	vector<vector<vector<int>>> &gastoEnergia, 
+	vector<vector<vector<Predecesor>>> &predecesores)
+{
+
+	// Acciones posibles del agente
+	const vector<Action> acciones = {Action::RUN, Action::WALK, Action::TURN_SR, Action::TURN_L};
+
+	const int INVALID = -1;	// Como no hay un valor máximo, ponemos un valor imposible
+	
+	// Inicializamos las matrices de Dijkstra
+	gastoEnergia.clear();
+	gastoEnergia.resize(mapaResultado.size(), vector<vector<int>>(mapaResultado.at(0).size(), vector<int>(8, INVALID)));
+
+
+	predecesores.clear();
+	predecesores.resize(mapaResultado.size(), vector<vector<Predecesor>>(mapaResultado.at(0).size(), vector<Predecesor>(8, {INVALID, INVALID, INVALID, {}})));
+
+
+	// Inicializamos el nodo origen
+	gastoEnergia.at(origen.fil).at(origen.col).at(origen.orientacion) = 0;	// Gasto de energía al nodo origen
+	predecesores.at(origen.fil).at(origen.col).at(origen.orientacion) = {origen.fil, origen.col, origen.orientacion, {}};
+
+
+	// Cola con prioridad formada por Nodos. Ordenada por el gasto de Energia al nodo Origen
+	priority_queue<Nodo, vector<Nodo>, greater<>> frontera;
+
+	// Nodos ya visitados, para evitar repeticiones
+	set<Estado> visitados;
+
+
+	Nodo nodoActual = {origen, 0, {}};	// Nodo origen
+	frontera.push(nodoActual);
+	while(!frontera.empty()){
+		nodoActual = frontera.top();
+		frontera.pop();
+		
+		if (visitados.insert(nodoActual.estado).second){
+
+			// Comprobamos si hemos conseguido Zapatillas
+			if (mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == 'D')
+				nodoActual.estado.tieneZapatillas = true;
+
+			// Exploramos los nodos resultantes de aplicar cada una de las acciones
+			Action accion;
+			Nodo nuevoNodo;
+
+			#ifdef DEBUG_RESC_DIJK
+			cout << "-------------------------------------------------------"
+				<< "\nEstado actual: " << nodoActual.estado.fil << "," << nodoActual.estado.col << " "
+				<< "Orientacion: " << nodoActual.estado.orientacion << endl;
+			#endif
+
+
+			for (auto it = acciones.begin(); it != acciones.end(); ++it){
+				accion = *it;
+				nuevoNodo.estado = ejecutarAccion(accion, nodoActual.estado);
+				if (visitados.find(nuevoNodo.estado) == visitados.end()){
+
+					#ifdef DEBUG_RESC_DIJK
+					cout << "Nodo Expandido " << nuevoNodo.estado.fil << "," << nuevoNodo.estado.col << " "
+						<< "Orientacion: " << nuevoNodo.estado.orientacion << "(" << accion << ")" << endl;
+					#endif
+					// No se ha explorado, hay que explorarlo.
+
+
+					// Modificamos el gasto de energía del nuevo nodo
+					nuevoNodo.gastoEnergia = nodoActual.gastoEnergia + 1;	// TODO: Cambiar. Por ahora, cada acción gasta 1 de energía
+					nuevoNodo.acciones = nodoActual.acciones;
+					nuevoNodo.acciones.push_back(accion);
+					
+					if (gastoEnergia.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion) == INVALID
+						|| nuevoNodo.gastoEnergia < gastoEnergia.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion)){
+
+						// Actualizamos las matrices de Dijkstra
+						gastoEnergia.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion) = nuevoNodo.gastoEnergia;
+						predecesores.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion).fil = nodoActual.estado.fil;
+						predecesores.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion).col = nodoActual.estado.col;
+						predecesores.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion).orientacion = nodoActual.estado.orientacion;
+						predecesores.at(nuevoNodo.estado.fil).at(nuevoNodo.estado.col).at(nuevoNodo.estado.orientacion).acciones = nuevoNodo.acciones;
+
+						cout << "Actualizamos!!!" << endl;
+						#ifdef DEBUG_RESC_DIJK
+						cout << "Gasto energia: " << nuevoNodo.gastoEnergia << endl;
+						cout << "Predecesor: " << nodoActual.estado.fil << "," << nodoActual.estado.col << " "
+							<< "Orientacion: " << nodoActual.estado.orientacion << endl;
+						cout << "Acciones: ";
+						for (auto it = nuevoNodo.acciones.begin(); it != nuevoNodo.acciones.end(); ++it)
+							cout << *it << " ";
+						cout << endl;
+						#endif
+
+						// Reseteamos las acciones; ya han quedado grabadas
+						nuevoNodo.acciones.clear();
+					}
+
+
+
+					// Añadimos el nuevo nodo a la frontera (podrá estar ya)
+					frontera.push(nuevoNodo);
+				} 
+			} // for accion
+		} // if visitados.insert
+	} // while frontera
+
+}
+
+void ComportamientoRescatador::VisualizaPlan(const Estado& origen, const list<Action>& plan){
+	
+	mapaConPlan.clear();
+	mapaConPlan.resize(mapaResultado.size(), vector<unsigned char>(mapaResultado.at(0).size(), 0));
+
+	Estado estadoActual = origen;
+	for(auto it = plan.begin(); it != plan.end(); ++it){
+
+		estadoActual = ejecutarAccion(*it, estadoActual);
+		switch (*it){
+			case Action::RUN:
+				mapaConPlan.at(estadoActual.fil).at(estadoActual.col) = 3;
+				break;
+			case Action::WALK:
+				mapaConPlan.at(estadoActual.fil).at(estadoActual.col) = 1;
+				break;
+		}
+	}
+}
+
+
+
 Action ComportamientoRescatador::ComportamientoRescatadorNivel_2(Sensores sensores)
 {
+	Action accion= IDLE;
+	if (plan.empty() && (sensores.posF != sensores.destinoF || sensores.posC != sensores.destinoC)){
+
+
+		// Inicializamos el nodo origen
+		Estado origen;
+		origen.fil = sensores.posF;
+		origen.col = sensores.posC;
+		origen.orientacion = sensores.rumbo;
+		origen.tieneZapatillas = tieneZapatillas;
+
+		// Inicializamos las matrices de Dijkstra
+		vector<vector<vector<int>>> gastoEnergia;
+		vector<vector<vector<Predecesor>>> predecesores;
+		Dijkstra(origen, gastoEnergia, predecesores);
+
+
+		int filObjetivo = sensores.destinoF;
+		int colObjetivo = sensores.destinoC;
+		int orientacionObjetivo;
+
+		// Para saber la direcciób objetivo, de entre las 8 posibles nos quedamos la que tenga menor gasto de energía
+		int minEnergia = gastoEnergia.at(filObjetivo).at(colObjetivo).at(0);
+		orientacionObjetivo = (Orientacion)0;
+		for (int i=1; i<8; ++i){
+			if (gastoEnergia.at(filObjetivo).at(colObjetivo).at(i) < minEnergia){
+				minEnergia = gastoEnergia.at(filObjetivo).at(colObjetivo).at(i);
+				orientacionObjetivo= (Orientacion)i;
+			}
+		}
+
+		cout << "Estado origen: " << origen.fil << "," << origen.col << " "
+			<< "Orientacion: " << origen.orientacion << endl;
+		cout << "Estado objetivo: " << filObjetivo << "," << colObjetivo << " "
+			<< "Orientacion: " << orientacionObjetivo << endl;
+		cout << "Gasto energia: " << minEnergia << endl;
+	
+
+
+		// Vamos añadiendo hasta que encontremos la que solo tiene IDLE
+		while (filObjetivo != origen.fil || colObjetivo != origen.col){
+			plan.insert(plan.begin(),
+						predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).acciones.begin(),
+						predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).acciones.end());
+
+			int filPredecesor = predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).fil;
+			int colPredecesor = predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).col;
+			int orientacionPredecesor = predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).orientacion;
+
+			#define DEBUG_RESC_DIJKSTRA 0
+			#ifdef DEBUG_RESC_DIJKSTRA
+			cout << "Casilla " << filObjetivo << "," << colObjetivo << " " << orientacionObjetivo << " "
+				<< "Gasto energia: " << gastoEnergia.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo) << endl;
+			cout << "Predecesor: " << filPredecesor << "," << colPredecesor << " "
+				<< "Orientacion: " << orientacionPredecesor << endl;
+			cout << "Acciones: ";
+			for (auto it = predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).acciones.begin(); it != predecesores.at(filObjetivo).at(colObjetivo).at(orientacionObjetivo).acciones.end(); ++it){
+				cout << *it << " ";
+			}
+			cout << endl;
+			cout << "------------------------" << endl;
+			#endif
+
+			filObjetivo = filPredecesor;
+			colObjetivo = colPredecesor;
+			orientacionObjetivo = orientacionPredecesor;
+
+		}
+		cout << "Plan encontrado " << plan.size() << endl;
+		// Imprimimos el plan
+		for (auto it = plan.begin(); it != plan.end(); ++it){
+			cout << *it << " ";
+		}
+		cout << endl;
+
+		VisualizaPlan(origen, plan);
+	}
+
+	else if (!plan.empty()){
+		accion = plan.front();
+		plan.pop_front();
+	}
+
+	return accion;
 }
 
 Action ComportamientoRescatador::ComportamientoRescatadorNivel_3(Sensores sensores)

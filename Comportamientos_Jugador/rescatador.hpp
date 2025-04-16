@@ -4,8 +4,70 @@
 #include <chrono>
 #include <time.h>
 #include <thread>
+#include <unordered_set>
+#include <list>
+#include <iostream>
 
 #include "comportamientos/comportamiento.hpp"
+
+
+/**
+ * @brief Struct que representa el estado del agente.
+ */
+struct Estado{
+  int fil;
+  int col;
+  Orientacion orientacion;
+  bool tieneZapatillas;
+
+  // Operador de Igualdad
+  bool operator==(const Estado & otro) const {
+    return fil == otro.fil
+        && col == otro.col
+        && orientacion == otro.orientacion
+        && tieneZapatillas == otro.tieneZapatillas;
+  }
+
+  // Operador de < para poder usarlo en un set
+  bool operator<(const Estado & otro) const {
+    if (fil < otro.fil)
+      return true;
+    else if (fil == otro.fil && col < otro.col)
+      return true;
+    else if (fil == otro.fil && col == otro.col && orientacion < otro.orientacion)
+      return true;
+    else if (fil == otro.fil && col == otro.col && orientacion == otro.orientacion && tieneZapatillas < otro.tieneZapatillas)
+      return true;
+    else
+      return false;
+  }
+};
+
+struct Nodo{
+  Estado estado;	// Estado del nodo
+  int gastoEnergia;	// Gasto de energía al nodo
+  list<Action> acciones;	// Acciones que se han realizado para llegar al nodo desde su predecesor
+
+  bool operator>(const Nodo & otro) const {
+    return gastoEnergia > otro.gastoEnergia;
+  }
+
+  bool operator==(const Nodo & otro) const {
+    return estado == otro.estado;
+  }
+};
+
+/**
+ * @brief Struct para recuperar el camino de Dijkstra.
+ */
+struct Predecesor{
+  int fil;		// Fila del predecesor
+  int col;		// Columna del predecesor
+  int orientacion;	// Orientación del predecesor
+  list<Action> acciones;	// Acciones que se han realizado para llegar desde el predecesor al nodo
+};
+
+
 
 class ComportamientoRescatador : public Comportamiento
 {
@@ -27,6 +89,8 @@ public:
   ComportamientoRescatador(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
     // Inicializar Variables de Estado Niveles 2,3
+    tieneZapatillas = false;
+    plan= list<Action>();
   }
   ComportamientoRescatador(const ComportamientoRescatador &comport) : Comportamiento(comport) {}
   ~ComportamientoRescatador() {}
@@ -52,6 +116,10 @@ private:
   static const int PROFUNDIDAD_SENSOR = 4; // Número de casillas hacia delante que ve el agente (incluyendo la suya misma)
   static const int NUM_CASILLAS = PROFUNDIDAD_SENSOR * PROFUNDIDAD_SENSOR; // Número de casillas que ve el agente
 
+  static const unordered_set<char> CASILLAS_NO_TRANSITABLES; // Conjunto de casillas no transitables
+
+  list<Action> plan; // Lista de acciones que forman el camino a seguir
+
 
   // Métodos Privados
 
@@ -67,13 +135,33 @@ private:
 
   /**
    * @brief Método que determina si la casilla es accesible o no.
-   * @param sensores  Estructura de datos que contiene la información de los sensores.
-   * @param casilla   Número de la casilla a comprobar.
    * 
-   * @return  true si la casilla es accesible.
-   *          false si la casilla no es accesible.
+   * @param sensores  Estructura de datos que contiene la información de los sensores.
+   * @param casilla  Número de la casilla.
    */
-  bool casillaAccesible(const Sensores & sensores, int casilla);
+  bool casillaAccesible(const Sensores& sensores, int casilla);
+
+  /**
+   * @brief Método que determina si la casilla es accesible o no.
+   * 
+   * @param estado  Estado del agente.
+   * @param casilla  Número de la casilla.
+   * 
+   * @pre No se comprueban agentes
+   */
+  bool casillaAccesible(const Estado& estado, int casilla);
+
+  /**
+   * @brief Método que determina si la casilla es accesible o no.
+   * 
+   * @param filAgente  Fila del agente.
+   * @param colAgente  Columna del agente.
+   * @param orientacion  Orientación del agente.
+   * @param casilla  Número de la casilla.
+   * @param conZapatillas  Indica si el agente tiene zapatillas.
+   * @param bool comprobarAgentes Indica si se debe comprobar que no hay agentes en la casilla.
+   */
+  bool casillaAccesible(int filAgente, int colAgente, Orientacion orientacion, bool conZapatillas, bool comprobarAgentes, int casilla);
 
   /**
    * @brief Método que actualiza la información de los sensores en los mapas del agente.
@@ -100,19 +188,47 @@ private:
   /**
    * @brief Método que devuelve las coordenadas en el mapa de la casilla relativa a la posición del agente.
    * 
-   * @param casillaRelativa  Número de la casilla relativa al agente.
-   * @param sensores      Sensores del agente
+   * @param filAgente  Fila de la casilla relativa.
+   * @param colAgente  Columna de la casilla relativa.
+   * @param orientacion  Orientación del agente.
+   * @param casillaRelativa  Número de la casilla relativa.
    * 
    * @return  Un par de enteros que representan las coordenadas de la casilla en el mapa.
    *          El primer entero es la fila y el segundo entero es la columna.
    */
-  pair<int, int> aCoordenadas(const Sensores& sensores, int casillaRelativa);
+  pair<int, int> aCoordenadas(int filAgente, int colAgente, Orientacion orientacion, int casillaRelativa);
 
 
   /**
    * @brief Método que actualiza las matrices de veces visitadas y vistas.
    */
   void actualizarMatrices_VistasVisitadas(const Sensores& sensores);
+
+
+  /**
+   * @brief Método que devuelve el estado del agente después de ejecutar una acción.
+   * 
+   * @param action  Acción a ejecutar.
+   * @param inicio  Estado inicial del agente.
+   */
+  Estado ejecutarAccion(Action action, const Estado & inicio);
+
+  /**
+   * @brief Método que implementa el algoritmo de Dijkstra para encontrar el camino más corto.
+   * 
+   * @param origen  Nodo de origen.
+   * @param gastoEnergia  Matriz que contiene el gasto de energía desde el origen a cada nodo.
+   * @param predecesores  Matriz que contiene los predecesores de cada nodo.
+   */
+  void Dijkstra(const Estado& origen, vector<vector<vector<int>>> &gastoEnergia, vector<vector<vector<Predecesor>>> &predecesores);
+
+  /**
+   * @brief Método que visualiza el plan de acciones a seguir.
+   * 
+   * @param origen  Estado inicial del agente.
+   * @param plan    Lista de acciones a seguir.
+   */
+  void VisualizaPlan(const Estado& origen, const list<Action>& plan);
 
 };
 
