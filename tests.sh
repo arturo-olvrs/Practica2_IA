@@ -61,6 +61,7 @@ done
 
 tests_2=(
     "$ejecutable mapas/mapa30.map 1 2 8 13 0 11 18 0 18 12 0"
+    "$ejecutable mapas/mapa75.map 0 2 15 6 2 14 17 0 50 50 0"
 )
 tests_3=(
     "$ejecutable mapas/mapa30.map 1 3 8 13 0 11 18 0 18 12 0"

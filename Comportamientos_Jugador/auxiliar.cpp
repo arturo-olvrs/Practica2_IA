@@ -14,6 +14,7 @@
 
 const unordered_set<char> ComportamientoAuxiliar::CASILLAS_NO_TRANSITABLES = {'P', 'M', 'B'};
 
+
 Action ComportamientoAuxiliar::think(Sensores sensores)
 {
 	Action accion = IDLE;

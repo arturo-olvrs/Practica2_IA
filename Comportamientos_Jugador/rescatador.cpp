@@ -279,7 +279,7 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 
 		if (casillaAccesible(sensores, casillaIntermedia) && casillaAccesible(sensores, casillaFinal)){
 
-			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
+			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, casillaFinal);
 			bool finalPermitida =	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
 
 			// La intermedia no se pisa.
@@ -305,7 +305,7 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		int casillaFinal 		= casillasAlcanzablesIndirectas_Atras.at(i);
 		if (casillaAccesible(sensores, casillaIntermedia) && casillaAccesible(sensores, casillaFinal)){
 
-			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
+			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, casillaFinal);
 			bool finalPermitida =	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
 
 			// La intermedia no se pisa.
@@ -322,6 +322,13 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		}
 	}
 
+	#ifdef DEBUG_RESC
+	cout << "Casillas accesibles: " << endl;
+	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
+		tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+		cout << "(" << fil << "," << col << ") " << mapaResultado.at(fil).at(col) << " " << *i << endl;
+	}
+	#endif
 
 
 	// Buscamos la casilla más interesante a la que ir
@@ -367,12 +374,26 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
 			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
 			double puntuacion = PESO_VISTA * numVecesVista.at(fil).at(col) + PESO_VISITADA * numVecesVisitada.at(fil).at(col);
+
+			#ifdef DEBUG_RESC
+			cout << "Casilla: " << *i << endl;
+			cout << "\t - fila: " << fil << endl;
+			cout << "\t - col: " << col << endl;
+			cout << "\t - numVecesVista: " << numVecesVista.at(fil).at(col) << endl;
+			cout << "\t - numVecesVisitada: " << numVecesVisitada.at(fil).at(col) << endl;
+			cout << "\t - puntuacion: " << puntuacion << endl;
+			#endif
+
 			if (puntuacion < minPuntuacion){
 				minPuntuacion = puntuacion;
 				res = *i;
 			}
 		}
 	}
+
+	#ifdef DEBUG_RESC
+	cout << "Casilla más interesante: " << res << endl;
+	#endif
 
 	return res;
 }
@@ -554,6 +575,7 @@ list<Action> ComportamientoRescatador::Dijkstra(
 		}
 	};
 
+
 	priority_queue<Nodo, vector<Nodo>, Comparador> frontera;
 
 	// Nodos ya visitados, para evitar repeticiones
@@ -562,8 +584,6 @@ list<Action> ComportamientoRescatador::Dijkstra(
 
 	Nodo nodoActual = {origen, 0, {}};	// Nodo origen
 	frontera.push(nodoActual);
-
-	#define DEBUG_DIJKSTRA
 
 	#ifdef DEBUG_DIJKSTRA
 		int interaciones = 0;
