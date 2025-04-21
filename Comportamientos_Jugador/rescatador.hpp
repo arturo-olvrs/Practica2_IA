@@ -127,19 +127,25 @@ private:
    * @brief Método que determina si la casilla es accesible o no.
    * 
    * @param sensores  Estructura de datos que contiene la información de los sensores.
+   * @param comprobarAltura  Indica si se debe comprobar la altura de la casilla.
    * @param casilla  Número de la casilla.
+   * 
+   * @return  true si la casilla es accesible, false en caso contrario.
    */
-  bool casillaAccesible(const Sensores& sensores, int casilla);
+  bool casillaAccesible(const Sensores& sensores, bool comprobarAltura, int casilla);
 
   /**
    * @brief Método que determina si la casilla es accesible o no.
    * 
    * @param estado  Estado del agente.
+   * @param comprobarAltura  Indica si se debe comprobar la altura de la casilla.
    * @param casilla  Número de la casilla.
    * 
    * @pre No se comprueban agentes
+   * 
+   * @return  true si la casilla es accesible, false en caso contrario.
    */
-  bool casillaAccesible(const Estado& estado, int casilla);
+  bool casillaAccesible(const Estado& estado, bool comprobarAltura, int casilla);
 
   /**
    * @brief Método que determina si la casilla es accesible o no.
@@ -149,9 +155,12 @@ private:
    * @param orientacion  Orientación del agente.
    * @param casilla  Número de la casilla.
    * @param conZapatillas  Indica si el agente tiene zapatillas.
-   * @param bool comprobarAgentes Indica si se debe comprobar que no hay agentes en la casilla.
+   * @param comprobarAgentes Indica si se debe comprobar que no hay agentes en la casilla.
+   * @param comprobarAltura Indica si se debe comprobar la altura de la casilla.
+   * 
+   * @return  true si la casilla es accesible, false en caso contrario.
    */
-  bool casillaAccesible(int filAgente, int colAgente, Orientacion orientacion, bool conZapatillas, bool comprobarAgentes, int casilla);
+  bool casillaAccesible(int filAgente, int colAgente, Orientacion orientacion, bool conZapatillas, bool comprobarAgentes, bool comprobarAltura, int casilla);
 
   /**
    * @brief Método que actualiza la información de los sensores en los mapas del agente.

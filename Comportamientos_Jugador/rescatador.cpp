@@ -215,17 +215,17 @@ void ComportamientoRescatador::actualizarMatrices_VistasVisitadas(const Sensores
 	}
 }
 
-bool ComportamientoRescatador::casillaAccesible(const Estado& estado, int casilla)
+bool ComportamientoRescatador::casillaAccesible(const Estado& estado, bool comprobarAltura, int casilla)
 {
-	return casillaAccesible(estado.fil, estado.col, estado.orientacion, estado.tieneZapatillas, false, casilla);
+	return casillaAccesible(estado.fil, estado.col, estado.orientacion, estado.tieneZapatillas, false, comprobarAltura, casilla);
 }
 
-bool ComportamientoRescatador::casillaAccesible(const Sensores& sensores, int casilla)
+bool ComportamientoRescatador::casillaAccesible(const Sensores& sensores, bool comprobarAltura, int casilla)
 {
-	return casillaAccesible(sensores.posF, sensores.posC, sensores.rumbo, tieneZapatillas, true, casilla);
+	return casillaAccesible(sensores.posF, sensores.posC, sensores.rumbo, tieneZapatillas, true, comprobarAltura, casilla);
 }
 
-bool ComportamientoRescatador::casillaAccesible(int filAgente, int colAgente, Orientacion orientacion, bool conZapatillas, bool comprobarAgentes, int casilla)
+bool ComportamientoRescatador::casillaAccesible(int filAgente, int colAgente, Orientacion orientacion, bool conZapatillas, bool comprobarAgentes, bool comprobarAltura, int casilla)
 {
 	// Comprobamos si la casilla es accesible o no. Será accesible si:
 	// 1. No es un precipicio
@@ -243,8 +243,10 @@ bool ComportamientoRescatador::casillaAccesible(int filAgente, int colAgente, Or
 	// Comprobamos que es transitable
 	accesible &= CASILLAS_NO_TRANSITABLES.find(mapaResultado.at(fil).at(col)) == CASILLAS_NO_TRANSITABLES.end();
 	
-	int dif = abs(mapaCotas.at(filAgente).at(colAgente) - mapaCotas.at(fil).at(col));
-	accesible &= (dif<=1 || (conZapatillas && dif <=2));
+	if (comprobarAltura){
+		int dif = abs(mapaCotas.at(filAgente).at(colAgente) - mapaCotas.at(fil).at(col));
+		accesible &= (dif<=1 || (conZapatillas && dif <=2));
+	}
 
 	return accesible;
 }
@@ -277,7 +279,7 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		int casillaIntermedia 	= casillasAlcanzablesDirectas.at(i);
 		int casillaFinal 		= casillasAlcanzablesIndirectas.at(i);
 
-		if (casillaAccesible(sensores, casillaIntermedia) && casillaAccesible(sensores, casillaFinal)){
+		if (casillaAccesible(sensores, false, casillaIntermedia) && casillaAccesible(sensores, true, casillaFinal)){
 
 			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, casillaFinal);
 			bool finalPermitida =	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
@@ -288,7 +290,7 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		}
 	}
 	for (auto i = casillasAlcanzablesDirectas.begin(); i != casillasAlcanzablesDirectas.end(); ++i){
-		if (casillaAccesible(sensores, *i)){
+		if (casillaAccesible(sensores, true, *i)){
 			tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
 			bool permitida = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
 			if (permitida)
@@ -303,7 +305,7 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		// Para llegar a casillasAlcanzablesIndirectas.at(i), ha de pasar por casillasAccesibleDirectas.at(i)
 		int casillaIntermedia 	= casillasAlcanzablesDirectas_Atras.at(i);
 		int casillaFinal 		= casillasAlcanzablesIndirectas_Atras.at(i);
-		if (casillaAccesible(sensores, casillaIntermedia) && casillaAccesible(sensores, casillaFinal)){
+		if (casillaAccesible(sensores, false, casillaIntermedia) && casillaAccesible(sensores, true, casillaFinal)){
 
 			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, casillaFinal);
 			bool finalPermitida =	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
@@ -314,7 +316,7 @@ int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 		}
 	}
 	for (auto i = casillasAlcanzablesDirectas_Atras.begin(); i != casillasAlcanzablesDirectas_Atras.end(); ++i){
-		if (casillaAccesible(sensores, *i)){
+		if (casillaAccesible(sensores, true, *i)){
 			tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
 			bool permitida = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
 			if (permitida)
@@ -535,7 +537,7 @@ Estado ComportamientoRescatador::ejecutarAccion(Action action, const Estado & in
 	Estado nuevoEstado = inicio;
 	switch (action){
 		case Action::RUN:
-			if (casillaAccesible(inicio, 2) && casillaAccesible(inicio, 6))
+			if (casillaAccesible(inicio, false, 2) && casillaAccesible(inicio, true, 6))
 				tie(nuevoEstado.fil, nuevoEstado.col) = aCoordenadas(inicio.fil, inicio.col, inicio.orientacion, 6);
 			break;
 		case Action::TURN_SR:
@@ -545,10 +547,11 @@ Estado ComportamientoRescatador::ejecutarAccion(Action action, const Estado & in
 			nuevoEstado.orientacion = (Orientacion)((8+(int)inicio.orientacion - 2) % 8);
 			break;
 		case Action::WALK:
-			if (casillaAccesible(inicio, 2))
+			if (casillaAccesible(inicio, true, 2))
 				tie(nuevoEstado.fil, nuevoEstado.col) = aCoordenadas(inicio.fil, inicio.col, inicio.orientacion, 2);
 			break;
 	}
+	
 	return nuevoEstado;
 }
 
@@ -607,8 +610,9 @@ list<Action> ComportamientoRescatador::Dijkstra(
 				interaciones++;
 			#endif
 
-			// Comprobamos si hemos conseguido Zapatillas
-			if (mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == 'D')
+
+			// Actualizamos el estado de las zapatillas
+			if (!nodoActual.estado.tieneZapatillas && mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == 'D')
 				nodoActual.estado.tieneZapatillas = true;
 
 			// Exploramos los nodos resultantes de aplicar cada una de las acciones
@@ -653,9 +657,16 @@ void ComportamientoRescatador::VisualizaPlan(const Estado& origen, const list<Ac
 	mapaConPlan.resize(mapaResultado.size(), vector<unsigned char>(mapaResultado.at(0).size(), 0));
 
 	Estado estadoActual = origen;
+	if (!estadoActual.tieneZapatillas && mapaResultado.at(estadoActual.fil).at(estadoActual.col) == 'D')
+		estadoActual.tieneZapatillas = true;
+
+
 	for(auto it = plan.begin(); it != plan.end(); ++it){
 
 		estadoActual = ejecutarAccion(*it, estadoActual);
+
+		if (!estadoActual.tieneZapatillas && mapaResultado.at(estadoActual.fil).at(estadoActual.col) == 'D')
+			estadoActual.tieneZapatillas = true;
 		switch (*it){
 			case Action::RUN:
 				mapaConPlan.at(estadoActual.fil).at(estadoActual.col) = 3;
