@@ -219,7 +219,7 @@ private:
    * 
    * @return  Gasto previsto de energía en llegar desde el estado actual al destino.
    */
-  int Heuristica(const Estado& estado, int filDestino, int colDestino);
+  static int Heuristica(const Estado& estado, int filDestino, int colDestino);
 
 
 

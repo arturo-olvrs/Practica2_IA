@@ -574,21 +574,25 @@ list<Action> ComportamientoAuxiliar::A_Estrella(
 
 	// Cola con prioridad formada por Nodos. Ordenada por el gasto de Energia al nodo Origen
 	struct Comparador {
-		bool operator()(const Nodo& a, const Nodo& b) {
-			// Retorna true si a tiene más energía que b,
-			// así el de menor energía queda al tope
-			return a.gastoEnergia > b.gastoEnergia;
+		int filDestino;
+		int colDestino;
+	
+		Comparador(int fil, int col) : filDestino(fil), colDestino(col) {}
+	
+		bool operator()(const Nodo& a, const Nodo& b) const {
+			return a.gastoEnergia + Heuristica(a.estado, filDestino, colDestino)
+				 > b.gastoEnergia + Heuristica(b.estado, filDestino, colDestino);
 		}
 	};
 
 
-	priority_queue<Nodo, vector<Nodo>, Comparador> frontera;
+	priority_queue<Nodo, vector<Nodo>, Comparador> frontera(Comparador(filDestino, colDestino));
 
 	// Nodos ya visitados, para evitar repeticiones
 	set<Nodo> visitados;
 
 
-	Nodo nodoActual = {origen, Heuristica(origen, filDestino, colDestino), {}};	// Nodo origen
+	Nodo nodoActual = {origen, 0, {}};	// Nodo origen
 	frontera.push(nodoActual);
 
 	#ifdef DEBUG_DIJKSTRA_AUX
@@ -630,8 +634,7 @@ list<Action> ComportamientoAuxiliar::A_Estrella(
 
 					// Modificamos el gasto de energía del nuevo nodo
 					nuevoNodo.gastoEnergia = nodoActual.gastoEnergia
-												+ gastoAccion(*it, nodoActual.estado.fil, nodoActual.estado.col, nuevoNodo.estado.fil, nuevoNodo.estado.col)
-												+ Heuristica(nuevoNodo.estado, filDestino, colDestino);
+												+ gastoAccion(*it, nodoActual.estado.fil, nodoActual.estado.col, nuevoNodo.estado.fil, nuevoNodo.estado.col);
 					nuevoNodo.acciones = nodoActual.acciones;
 					nuevoNodo.acciones.push_back(*it);
 					
