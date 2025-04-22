@@ -6,8 +6,12 @@
 #include <thread>
 #include <unordered_set>
 #include <list>
+#include <vector>
+
+using namespace std;
 
 #include "comportamientos/comportamiento.hpp"
+
 
 class ComportamientoAuxiliar : public Comportamiento
 {
@@ -28,6 +32,8 @@ public:
   ComportamientoAuxiliar(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
     // Inicializar Variables de Estado Niveles 2,3
+    tieneZapatillas = false;
+    plan= list<Action>();
   }
   ComportamientoAuxiliar(const ComportamientoAuxiliar &comport) : Comportamiento(comport) {}
   ~ComportamientoAuxiliar() {}
@@ -42,6 +48,8 @@ public:
   Action ComportamientoAuxiliarNivel_3(Sensores sensores);
   Action ComportamientoAuxiliarNivel_4(Sensores sensores);
 
+
+  
 private:
   // Definir Variables de Estado
   Action lastAction;      // Almacena la última acción realizada por el auxiliar
@@ -54,7 +62,58 @@ private:
 
   static const unordered_set<char> CASILLAS_NO_TRANSITABLES; // Conjunto de casillas no transitables
 
+  list<Action> plan; // Lista de acciones que forman el camino a seguir
 
+
+  /**
+   * @brief Struct que representa el estado del agente.
+   */
+  struct Estado{
+    int fil;
+    int col;
+    Orientacion orientacion;
+    bool tieneZapatillas;
+
+    // Operador de Igualdad
+    bool operator==(const Estado & otro) const {
+      return fil == otro.fil
+          && col == otro.col
+          && orientacion == otro.orientacion
+          && tieneZapatillas == otro.tieneZapatillas;
+    }
+
+    // Operador de < para poder usarlo en un set
+    bool operator<(const Estado & otro) const {
+      if (fil < otro.fil)
+        return true;
+      else if (fil == otro.fil && col < otro.col)
+        return true;
+      else if (fil == otro.fil && col == otro.col && orientacion < otro.orientacion)
+        return true;
+      else if (fil == otro.fil && col == otro.col && orientacion == otro.orientacion && tieneZapatillas < otro.tieneZapatillas)
+        return true;
+      else
+        return false;
+    }
+  };
+
+  /**
+   * @brief Struct que representa un nodo en el algoritmo de A*.
+   */
+  struct Nodo{
+    Estado estado;	// Estado del nodo
+    int gastoEnergia;	// Gasto de energía al nodo
+    list<Action> acciones;	// Acciones que se han realizado para llegar al nodo
+
+    bool operator<(const Nodo & otro) const {
+      return estado < otro.estado;
+    }
+
+    bool operator==(const Nodo & otro) const {
+      return estado == otro.estado;
+    }
+  };
+  
   // Métodos Privados
 
   /**
@@ -74,6 +133,19 @@ private:
    * @param casilla  Número de la casilla.
    */
   bool casillaAccesible(const Sensores& sensores, int casilla);
+
+
+  /**
+   * @brief Método que determina si la casilla es accesible o no.
+   * 
+   * @param estado  Estado del agente.
+   * @param casilla  Número de la casilla.
+   * 
+   * @pre No se comprueban agentes
+   * 
+   * @return  true si la casilla es accesible, false en caso contrario.
+   */
+  bool casillaAccesible(const Estado& estado, int casilla);
 
 
   /**
@@ -126,6 +198,64 @@ private:
    * @brief Método que actualiza las matrices de veces visitadas y vistas.
    */
   void actualizarMatrices_VistasVisitadas(const Sensores& sensores);
+
+
+
+  /**
+   * @brief Método que devuelve el estado del agente después de ejecutar una acción.
+   * 
+   * @param action  Acción a ejecutar.
+   * @param inicio  Estado inicial del agente.
+   */
+  Estado ejecutarAccion(Action action, const Estado & inicio);
+
+  
+  /**
+   * @brief Método que calcula la heurística para el algoritmo de A*.
+   * 
+   * @param estado  Estado del agente.
+   * @param filDestino  Fila de la casilla destino.
+   * @param colDestino  Columna de la casilla destino.
+   * 
+   * @return  Gasto previsto de energía en llegar desde el estado actual al destino.
+   */
+  int Heuristica(const Estado& estado, int filDestino, int colDestino);
+
+
+
+  /**
+   * @brief Método que implementa el algoritmo de A* para encontrar el camino más corto.
+   * 
+   * @param origen  Estado de origen.
+   * @param filDestino  Fila de la casilla destino.
+   * @param colDestino  Columna de la casilla destino.
+   * 
+   * @return  Lista de acciones a seguir para llegar al destino.
+   */
+  list<Action> A_Estrella(const Estado& origen, int filDestino, int colDestino);
+  
+  /**
+   * @brief Método que calcula el gasto de energía al realizar una acción.
+   * 
+   * @param action  Acción a realizar.
+   * @param filInicio  Fila de la casilla inicial.
+   * @param colInicio  Columna de la casilla inicial.
+   * @param filDestino  Fila de la casilla destino.
+   * @param colDestino  Columna de la casilla destino.
+   * 
+   * @return  Gasto de energía al realizar la acción.
+   * 
+   * @pre La acción es válida
+   */
+  int gastoAccion(Action action, int filInicio, int colInicio, int filDestino, int colDestino);
+
+  /**
+   * @brief Método que visualiza el plan de acciones a seguir.
+   * 
+   * @param origen  Estado inicial del agente.
+   * @param plan    Lista de acciones a seguir.
+   */
+  void VisualizaPlan(const Estado& origen, const list<Action>& plan);
 };
 
 #endif

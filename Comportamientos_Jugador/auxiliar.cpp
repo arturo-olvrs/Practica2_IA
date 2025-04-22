@@ -31,7 +31,7 @@ Action ComportamientoAuxiliar::think(Sensores sensores)
 		accion = ComportamientoAuxiliarNivel_2 (sensores);
 		break;
 	case 3:
-		// accion = ComportamientoAuxiliarNivel_3 (sensores);
+		accion = ComportamientoAuxiliarNivel_3 (sensores);
 		break;
 	case 4:
 		// accion = ComportamientoAuxiliarNivel_4 (sensores);
@@ -226,6 +226,11 @@ void ComportamientoAuxiliar::actualizarMatrices_VistasVisitadas(const Sensores& 
 bool ComportamientoAuxiliar::casillaAccesible(const Sensores& sensores, int casilla)
 {
 	return casillaAccesible(sensores.posF, sensores.posC, sensores.rumbo, tieneZapatillas, true, casilla);
+}
+
+bool ComportamientoAuxiliar::casillaAccesible(const Estado& estado, int casilla)
+{
+	return casillaAccesible(estado.fil, estado.col, estado.orientacion, estado.tieneZapatillas, false, casilla);
 }
 
 bool ComportamientoAuxiliar::casillaAccesible(int filAgente, int colAgente, Orientacion orientacion, bool conZapatillas, bool comprobarAgentes, int casilla)
@@ -463,17 +468,247 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_1(Sensores sensores)
 	return action;
 }
 
+// -----------------------------------------------------------------------------
+
+
+
 Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_2(Sensores sensores)
 {
 	Action action = IDLE;	// Acción por defecto.
-
+	lastAction = action;
 	return action;
+}
+
+
+// -----------------------------------------------------------------------------
+
+ComportamientoAuxiliar::Estado ComportamientoAuxiliar::ejecutarAccion(Action action, const Estado & inicio){
+
+	Estado nuevoEstado = inicio;
+	switch (action){
+		case Action::TURN_SR:
+			nuevoEstado.orientacion = (Orientacion)(((int)inicio.orientacion + 1) % 8);
+			break;
+		case Action::WALK:
+			if (casillaAccesible(inicio, 2))
+				tie(nuevoEstado.fil, nuevoEstado.col) = aCoordenadas(inicio.fil, inicio.col, inicio.orientacion, 2);
+			break;
+	}
+	
+	return nuevoEstado;
+}
+
+
+int ComportamientoAuxiliar::gastoAccion(Action action, int filInicio, int colInicio, int filDestino, int colDestino){
+	int gasto=0;
+	int difAltura = mapaCotas.at(filDestino).at(colDestino) - mapaCotas.at(filInicio).at(colInicio);
+	if (difAltura > 0)
+		difAltura = 1;
+	else if (difAltura < 0)
+		difAltura = -1;
+	// difAltura == 0 ya está correcto
+
+	switch (action){
+		case Action::WALK:
+			switch (mapaResultado.at(filInicio).at(colInicio)){
+				case 'A':
+					gasto = 100;
+					gasto += difAltura * 10;
+					break;
+				case 'T':
+					gasto = 20;
+					gasto += difAltura * 5;
+					break;
+				case 'S':
+					gasto = 2;
+					gasto += difAltura * 1;
+					break;
+				default:
+					gasto = 1;
+					gasto += difAltura * 0;
+					break;
+			}
+			break;
+		case Action::TURN_SR:
+			switch (mapaResultado.at(filInicio).at(colInicio)){
+				case 'A':
+					gasto = 16;
+					break;
+				case 'T':
+					gasto = 3;
+					break;
+				case 'S':
+					gasto = 1;
+					break;
+				default:
+					gasto = 1;
+					break;
+			}
+			break;
+	}	
+	
+	return gasto;
+}
+
+int ComportamientoAuxiliar::Heuristica(const Estado& estado, int filDestino, int colDestino)
+{
+	// Heurística de la Norma Infinito
+	int difFil = abs(estado.fil - filDestino);
+	int difCol = abs(estado.col - colDestino);
+	return max(difFil, difCol);
+}
+
+
+
+list<Action> ComportamientoAuxiliar::A_Estrella(
+	const Estado &origen,
+	int filDestino,
+	int colDestino)
+{
+
+	// Acciones posibles del agente
+	const vector<Action> acciones = {Action::WALK, Action::TURN_SR};
+
+	const int INVALID = -1;	// Como no hay un valor máximo, ponemos un valor imposible
+	
+
+	// Cola con prioridad formada por Nodos. Ordenada por el gasto de Energia al nodo Origen
+	struct Comparador {
+		bool operator()(const Nodo& a, const Nodo& b) {
+			// Retorna true si a tiene más energía que b,
+			// así el de menor energía queda al tope
+			return a.gastoEnergia > b.gastoEnergia;
+		}
+	};
+
+
+	priority_queue<Nodo, vector<Nodo>, Comparador> frontera;
+
+	// Nodos ya visitados, para evitar repeticiones
+	set<Nodo> visitados;
+
+
+	Nodo nodoActual = {origen, Heuristica(origen, filDestino, colDestino), {}};	// Nodo origen
+	frontera.push(nodoActual);
+
+	#ifdef DEBUG_DIJKSTRA_AUX
+		int interaciones = 0;
+	#endif
+
+
+
+
+	bool caminoOptimoEncontrado = false;
+	while(!frontera.empty() && !caminoOptimoEncontrado){
+
+		nodoActual = frontera.top();
+		frontera.pop();
+
+		// Comprobamos si el nodo actual es el destino
+		caminoOptimoEncontrado = (nodoActual.estado.fil == filDestino && nodoActual.estado.col == colDestino);
+		
+		if (!caminoOptimoEncontrado && visitados.insert(nodoActual).second){
+
+			#ifdef DEBUG_DIJKSTRA_AUX
+				interaciones++;
+			#endif
+
+
+			// Actualizamos el estado de las zapatillas
+			if (!nodoActual.estado.tieneZapatillas && mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == 'D')
+				nodoActual.estado.tieneZapatillas = true;
+
+			// Exploramos los nodos resultantes de aplicar cada una de las acciones
+			Nodo nuevoNodo;
+
+
+			for (auto it = acciones.begin(); it != acciones.end(); ++it){
+				nuevoNodo.estado = ejecutarAccion(*it, nodoActual.estado);
+
+				// Comprobamos que se ha generado un nodo nuevo
+				if (visitados.find(nuevoNodo) == visitados.end()){
+
+					// Modificamos el gasto de energía del nuevo nodo
+					nuevoNodo.gastoEnergia = nodoActual.gastoEnergia
+												+ gastoAccion(*it, nodoActual.estado.fil, nodoActual.estado.col, nuevoNodo.estado.fil, nuevoNodo.estado.col)
+												+ Heuristica(nuevoNodo.estado, filDestino, colDestino);
+					nuevoNodo.acciones = nodoActual.acciones;
+					nuevoNodo.acciones.push_back(*it);
+					
+
+					// Añadimos el nuevo nodo a la frontera (podrá estar ya, pero podemos haber encontrado un camino mejor)
+					frontera.push(nuevoNodo);
+				} 
+			} // for accion
+		} // if visitados.insert
+	} // while frontera
+
+	// Si hemos encontrado el camino óptimo, lo devolvemos
+	list<Action> plan = caminoOptimoEncontrado ? nodoActual.acciones : list<Action>();
+
+	#ifdef DEBUG_DIJKSTRA_AUX
+		cout << "Iteraciones: " << interaciones << endl;
+		cout << "Nodos abiertos: " << frontera.size() << endl;
+		cout << "Nodos cerrados: " << visitados.size() << endl;
+	#endif
+		
+	return plan;
+
+}
+
+void ComportamientoAuxiliar::VisualizaPlan(const Estado& origen, const list<Action>& plan){
+	
+	mapaConPlan.clear();
+	mapaConPlan.resize(mapaResultado.size(), vector<unsigned char>(mapaResultado.at(0).size(), 0));
+
+	Estado estadoActual = origen;
+	if (!estadoActual.tieneZapatillas && mapaResultado.at(estadoActual.fil).at(estadoActual.col) == 'D')
+		estadoActual.tieneZapatillas = true;
+
+
+	for(auto it = plan.begin(); it != plan.end(); ++it){
+
+		estadoActual = ejecutarAccion(*it, estadoActual);
+
+		if (!estadoActual.tieneZapatillas && mapaResultado.at(estadoActual.fil).at(estadoActual.col) == 'D')
+			estadoActual.tieneZapatillas = true;
+		switch (*it){
+			case Action::WALK:
+				mapaConPlan.at(estadoActual.fil).at(estadoActual.col) = 2;
+				break;
+		}
+	}
 }
 
 Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_3(Sensores sensores)
 {
+	Action accion= IDLE;
+	if (plan.empty() && (sensores.posF != sensores.destinoF || sensores.posC != sensores.destinoC)){
+
+
+		// Inicializamos el nodo origen
+		Estado origen;
+		origen.fil = sensores.posF;
+		origen.col = sensores.posC;
+		origen.orientacion = sensores.rumbo;
+		origen.tieneZapatillas = tieneZapatillas;
+
+		
+		plan = A_Estrella(origen, sensores.destinoF, sensores.destinoC);
+
+		VisualizaPlan(origen, plan);
+	}
+
+	if (!plan.empty()){
+		accion = plan.front();
+		plan.pop_front();
+	}
+
+	return accion;
 }
 
 Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_4(Sensores sensores)
 {
+	Action action = IDLE;	// Acción por defecto.
+	return action;
 }

@@ -11,51 +11,7 @@
 #include "comportamientos/comportamiento.hpp"
 
 
-/**
- * @brief Struct que representa el estado del agente.
- */
-struct Estado{
-  int fil;
-  int col;
-  Orientacion orientacion;
-  bool tieneZapatillas;
 
-  // Operador de Igualdad
-  bool operator==(const Estado & otro) const {
-    return fil == otro.fil
-        && col == otro.col
-        && orientacion == otro.orientacion
-        && tieneZapatillas == otro.tieneZapatillas;
-  }
-
-  // Operador de < para poder usarlo en un set
-  bool operator<(const Estado & otro) const {
-    if (fil < otro.fil)
-      return true;
-    else if (fil == otro.fil && col < otro.col)
-      return true;
-    else if (fil == otro.fil && col == otro.col && orientacion < otro.orientacion)
-      return true;
-    else if (fil == otro.fil && col == otro.col && orientacion == otro.orientacion && tieneZapatillas < otro.tieneZapatillas)
-      return true;
-    else
-      return false;
-  }
-};
-
-struct Nodo{
-  Estado estado;	// Estado del nodo
-  int gastoEnergia;	// Gasto de energía al nodo
-  list<Action> acciones;	// Acciones que se han realizado para llegar al nodo
-
-  bool operator<(const Nodo & otro) const {
-    return estado < otro.estado;
-  }
-
-  bool operator==(const Nodo & otro) const {
-    return estado == otro.estado;
-  }
-};
 
 
 
@@ -109,6 +65,58 @@ private:
   static const unordered_set<char> CASILLAS_NO_TRANSITABLES; // Conjunto de casillas no transitables
 
   list<Action> plan; // Lista de acciones que forman el camino a seguir
+
+
+
+  /**
+   * @brief Struct que representa el estado del agente.
+   */
+  struct Estado{
+    int fil;
+    int col;
+    Orientacion orientacion;
+    bool tieneZapatillas;
+
+    // Operador de Igualdad
+    bool operator==(const Estado & otro) const {
+      return fil == otro.fil
+          && col == otro.col
+          && orientacion == otro.orientacion
+          && tieneZapatillas == otro.tieneZapatillas;
+    }
+
+    // Operador de < para poder usarlo en un set
+    bool operator<(const Estado & otro) const {
+      if (fil < otro.fil)
+        return true;
+      else if (fil == otro.fil && col < otro.col)
+        return true;
+      else if (fil == otro.fil && col == otro.col && orientacion < otro.orientacion)
+        return true;
+      else if (fil == otro.fil && col == otro.col && orientacion == otro.orientacion && tieneZapatillas < otro.tieneZapatillas)
+        return true;
+      else
+        return false;
+    }
+  };
+
+
+  /**
+   * @brief Struct que representa un nodo en el algoritmo de Dijkstra.
+   */
+  struct Nodo{
+    Estado estado;	// Estado del nodo
+    int gastoEnergia;	// Gasto de energía al nodo
+    list<Action> acciones;	// Acciones que se han realizado para llegar al nodo
+
+    bool operator<(const Nodo & otro) const {
+      return estado < otro.estado;
+    }
+
+    bool operator==(const Nodo & otro) const {
+      return estado == otro.estado;
+    }
+  };
 
 
   // Métodos Privados

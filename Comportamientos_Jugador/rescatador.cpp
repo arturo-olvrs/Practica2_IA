@@ -33,7 +33,7 @@ Action ComportamientoRescatador::think(Sensores sensores)
 		accion = ComportamientoRescatadorNivel_2 (sensores);
 		break;
 	case 3:
-		// accion = ComportamientoRescatadorNivel_3 (sensores);
+		accion = ComportamientoRescatadorNivel_3 (sensores);
 		break;
 	case 4:
 		// accion = ComportamientoRescatadorNivel_4 (sensores);
@@ -532,7 +532,7 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_1(Sensores sensor
 
 // -----------------------------------------------------------------------------
 
-Estado ComportamientoRescatador::ejecutarAccion(Action action, const Estado & inicio){
+ComportamientoRescatador::Estado ComportamientoRescatador::ejecutarAccion(Action action, const Estado & inicio){
 
 	Estado nuevoEstado = inicio;
 	switch (action){
@@ -787,7 +787,7 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_2(Sensores sensor
 		VisualizaPlan(origen, plan);
 	}
 
-	else if (!plan.empty()){
+	if (!plan.empty()){
 		accion = plan.front();
 		plan.pop_front();
 	}
