@@ -257,6 +257,65 @@ bool ComportamientoAuxiliar::casillaAccesible(int filAgente, int colAgente, Orie
 }
 
 
+int ComportamientoAuxiliar::determinaEmpatadas(vector<int> &casillasEmpatadas, const Sensores & sensores){
+	int distancia=0;
+	int res=0;
+
+	// Para cada distancia, hemos de almacenar la primera en borrarse por si todas están a la misma distancia
+	int primera_borrada = 0;
+
+	// Si hay alguna que es positiva, elimino las negativas (no queremos ir atrás)
+	bool hayPositiva=false;
+	for (auto i = casillasEmpatadas.begin(); i != casillasEmpatadas.end(); ++i){
+		hayPositiva |= *i > 0;
+
+		// Haciendo uso de que las negativas estarán detrás, las elimino
+		if (hayPositiva && *i < 0){
+			i = casillasEmpatadas.erase(i);
+			-- i;
+		}
+	}
+
+	// Si hay más de una casilla empatada, se elige la que esté más cerca de un ?
+	while (res == 0 && casillasEmpatadas.size() > 1){
+		primera_borrada = 0;
+		distancia++;
+
+		for (auto i = casillasEmpatadas.begin(); i != casillasEmpatadas.end()
+													&& res==0; ++i){
+			int fil_accion, col_accion;
+			tie(fil_accion, col_accion) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+
+			int nueva_fil = sensores.posF + (fil_accion - sensores.posF)/((double) abs(fil_accion - sensores.posF)) * distancia;
+			int nueva_col = sensores.posC + (col_accion - sensores.posC)/((double) abs(col_accion - sensores.posC)) * distancia;
+
+			// Si ya me salgo del mapa, borro la casilla
+			if (nueva_fil < 0 || nueva_col < 0 || nueva_fil >= mapaResultado.size() || nueva_col >= mapaResultado.at(0).size()){
+				
+				if (primera_borrada == 0)
+					primera_borrada = *i;
+				i = casillasEmpatadas.erase(i);
+				-- i;
+			}
+			// Si encuentro un ?, me quedo con esa casilla
+			else if (mapaResultado.at(nueva_fil).at(nueva_col) == '?')
+				res = *i;
+			
+		} // for
+	} // while 
+
+	// Si no he encontrado un ?, y ya no quedan, todos estaban a la misma distancia
+	if (res == 0 && casillasEmpatadas.size() == 0)
+		res = primera_borrada;
+
+	// Si no he encontrado y aún quedan empatados, esa es la única opción
+	else if (res == 0 && casillasEmpatadas.size() == 1)
+		res = casillasEmpatadas.at(0);
+	
+	return res;
+}
+
+
 int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 
 	// Tipos de casillas permitidas
@@ -273,14 +332,6 @@ int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 	vector<int> casillasAccesibles;
 	int fil,col;
 
-	#ifdef DEBUG
-	cout << "Casillas alcanzables: " << endl;
-	for (auto i = casillasAlcanzables.begin(); i != casillasAlcanzables.end(); ++i){
-		tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
-		cout << "(" << fil << "," << col << ") " << mapaResultado.at(fil).at(col) << " " << *i << endl;
-	}
-	#endif
-
 
 	for (auto i = casillasAlcanzables.begin(); i != casillasAlcanzables.end(); ++i){
 		if (casillaAccesible(sensores, *i)){
@@ -290,7 +341,8 @@ int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 				casillasAccesibles.push_back(*i);
 		}
 	}
-	#ifdef DEBUG
+
+	#ifdef DEBUG_AUX
 	cout << "Casillas accesibles: " << endl;
 	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
 		tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
@@ -337,20 +389,47 @@ int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 
 		tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, casillasAccesibles.at(0));
 		minPuntuacion = PESO_VISTA * numVecesVista.at(fil).at(col) + PESO_VISITADA * numVecesVisitada.at(fil).at(col);
-		res = casillasAccesibles.at(0);
+		vector<int> casillasEmpatadas;		// Casillas empatadas con la mínima puntuación
+		// No se hace el push back, puesto que en algún momento se llegará ahí
 
 		// Buscamos la casilla con menor número de veces visitada
 		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
 			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
 			double puntuacion = PESO_VISTA * numVecesVista.at(fil).at(col) + PESO_VISITADA * numVecesVisitada.at(fil).at(col);
+			if (*i==2) puntuacion -= PESO_VISTA;		// Ventaja a avanzar recto
+
+			#ifdef DEBUG_AUX
+			cout << "Casilla: " << *i << endl;
+			cout << "\t - fila: " << fil << endl;
+			cout << "\t - col: " << col << endl;
+			cout << "\t - numVecesVista: " << numVecesVista.at(fil).at(col) << endl;
+			cout << "\t - numVecesVisitada: " << numVecesVisitada.at(fil).at(col) << endl;
+			cout << "\t - puntuacion: " << puntuacion << endl;
+			#endif
+
 			if (puntuacion < minPuntuacion){
 				minPuntuacion = puntuacion;
-				res = *i;
+				casillasEmpatadas.clear();
+				casillasEmpatadas.push_back(*i);
 			}
+			else if (puntuacion == minPuntuacion){
+				casillasEmpatadas.push_back(*i);
+			}
+		} // fin for
+
+		#ifdef DEBUG_AUX
+		cout << "Casillas empatadas: " << endl;
+		for (auto i = casillasEmpatadas.begin(); i != casillasEmpatadas.end(); ++i){
+			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+			cout << "- (" << fil << "," << col << ") " << mapaResultado.at(fil).at(col) << " " << *i << endl;
 		}
+		#endif
+
+		// De todas las casillas empatadas, elijo la más interesante
+		res = determinaEmpatadas(casillasEmpatadas, sensores);
 	}
 
-	#ifdef DEBUG
+	#ifdef DEBUG_AUX
 	cout << "Casilla más interesante: " << res << endl;
 	#endif
 	
@@ -434,6 +513,9 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_1(Sensores sensores)
 		action = Action::TURN_SR;
 		--num_TURN_SR_Restantes;
 	}
+	else if (sensores.energia < MAYOR_COSTE){
+		action = Action::IDLE;
+	}
 	else{ // Vamos a realizar el movimiento determinado por lo que veo
 
 		int res = veoCasillaInteresante(sensores);
@@ -462,6 +544,10 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_1(Sensores sensores)
 				break;
 		}
 
+	}
+
+	if (sensores.energia < 100){
+		cout << "Queda poca energia Aux: " << sensores.energia << endl;
 	}
 
 	lastAction = action;	// Actualizamos la última acción realizada
@@ -560,7 +646,7 @@ int ComportamientoAuxiliar::Heuristica(const Estado& estado, int filDestino, int
 
 
 
-list<Action> ComportamientoAuxiliar::A_Estrella(
+vector<Action> ComportamientoAuxiliar::A_Estrella(
 	const Estado &origen,
 	int filDestino,
 	int colDestino)
@@ -647,7 +733,7 @@ list<Action> ComportamientoAuxiliar::A_Estrella(
 	} // while frontera
 
 	// Si hemos encontrado el camino óptimo, lo devolvemos
-	list<Action> plan = caminoOptimoEncontrado ? nodoActual.acciones : list<Action>();
+	vector<Action> plan = caminoOptimoEncontrado ? nodoActual.acciones : vector<Action>();
 
 	#ifdef DEBUG_DIJKSTRA_AUX
 		cout << "Iteraciones: " << interaciones << endl;
@@ -659,7 +745,7 @@ list<Action> ComportamientoAuxiliar::A_Estrella(
 
 }
 
-void ComportamientoAuxiliar::VisualizaPlan(const Estado& origen, const list<Action>& plan){
+void ComportamientoAuxiliar::VisualizaPlan(const Estado& origen, const vector<Action>& plan){
 	
 	mapaConPlan.clear();
 	mapaConPlan.resize(mapaResultado.size(), vector<unsigned char>(mapaResultado.at(0).size(), 0));
@@ -703,8 +789,14 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_3(Sensores sensores)
 	}
 
 	if (!plan.empty()){
-		accion = plan.front();
-		plan.pop_front();
+		accion = plan.at(numEnPlan);
+		++numEnPlan;
+
+		// Si hemos terminado el plan, lo reinicializamos
+		if (numEnPlan >= plan.size()){
+			numEnPlan = 0;
+			plan.clear();
+		}
 	}
 
 	return accion;

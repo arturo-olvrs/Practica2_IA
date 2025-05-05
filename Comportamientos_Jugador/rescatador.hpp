@@ -5,8 +5,9 @@
 #include <time.h>
 #include <thread>
 #include <unordered_set>
-#include <list>
+#include <vector>
 #include <iostream>
+#include <set>
 
 #include "comportamientos/comportamiento.hpp"
 
@@ -36,7 +37,8 @@ public:
   {
     // Inicializar Variables de Estado Niveles 2,3
     tieneZapatillas = false;
-    plan= list<Action>();
+    plan= vector<Action>();
+    numEnPlan = 0;
   }
   ComportamientoRescatador(const ComportamientoRescatador &comport) : Comportamiento(comport) {}
   ~ComportamientoRescatador() {}
@@ -55,16 +57,18 @@ private:
   // Variables de Estado
   Action lastAction;      // Almacena la última acción realizada por el rescatador
   bool tieneZapatillas;   // Indica si el rescatador tiene zapatillas
-  bool inTURN_SL;          // Indica si el rescatador está en su turno de SL
-  bool inTURN_R;          // Indica si el rescatador está en su turno de SR
+  bool inTURN_SL;          // Indica si el rescatador está en su giro de SL
+  bool inTURN_R;          // Indica si el rescatador está en su giro de SR
   vector<vector<int>> numVecesVisitada;
   vector<vector<int>> numVecesVista;
   static const int PROFUNDIDAD_SENSOR = 4; // Número de casillas hacia delante que ve el agente (incluyendo la suya misma)
   static const int NUM_CASILLAS = PROFUNDIDAD_SENSOR * PROFUNDIDAD_SENSOR; // Número de casillas que ve el agente
+  static const int MAYOR_COSTE = 7; // Coste máximo de una acción
 
   static const unordered_set<char> CASILLAS_NO_TRANSITABLES; // Conjunto de casillas no transitables
 
-  list<Action> plan; // Lista de acciones que forman el camino a seguir
+  vector<Action> plan; // Lista de acciones que forman el camino a seguir
+  int numEnPlan;       // Número de la acción en el plan que se está ejecutando
 
 
 
@@ -107,7 +111,7 @@ private:
   struct Nodo{
     Estado estado;	// Estado del nodo
     int gastoEnergia;	// Gasto de energía al nodo
-    list<Action> acciones;	// Acciones que se han realizado para llegar al nodo
+    vector<Action> acciones;	// Acciones que se han realizado para llegar al nodo
 
     bool operator<(const Nodo & otro) const {
       return estado < otro.estado;
@@ -130,6 +134,17 @@ private:
    *          0 si no ve ninguna casilla interesante. En ese caso, hará TURN_L
    */
   int veoCasillaInteresante(const Sensores & sensores);
+
+
+  /**
+   * @brief Método que determina la casilla más interesante a la que se puede mover el rescatador (dentro de las empatadas)
+   * 
+   * @param casillasEmpatadas  Conjunto de casillas empatadas.
+   * @param sensores  Estructura de datos que contiene la información de los sensores.
+   * 
+   * @return  Número de la casilla más interesante a la que se puede mover el rescatador (dentro de las empatadas)
+   */
+  int determinaEmpatadas(vector<int> &casillasEmpatadas, const Sensores & sensores);
 
   /**
    * @brief Método que determina si la casilla es accesible o no.
@@ -229,7 +244,7 @@ private:
    * 
    * @return  Lista de acciones a seguir para llegar al destino.
    */
-  list<Action> Dijkstra(const Estado& origen, int filDestino, int colDestino);
+  vector<Action> Dijkstra(const Estado& origen, int filDestino, int colDestino);
   
   /**
    * @brief Método que calcula el gasto de energía al realizar una acción.
@@ -252,7 +267,7 @@ private:
    * @param origen  Estado inicial del agente.
    * @param plan    Lista de acciones a seguir.
    */
-  void VisualizaPlan(const Estado& origen, const list<Action>& plan);
+  void VisualizaPlan(const Estado& origen, const vector<Action>& plan);
 
 };
 

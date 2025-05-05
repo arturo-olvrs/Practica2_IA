@@ -5,7 +5,6 @@
 #include <time.h>
 #include <thread>
 #include <unordered_set>
-#include <list>
 #include <vector>
 
 using namespace std;
@@ -33,7 +32,8 @@ public:
   {
     // Inicializar Variables de Estado Niveles 2,3
     tieneZapatillas = false;
-    plan= list<Action>();
+    plan= vector<Action>();
+    numEnPlan = 0;
   }
   ComportamientoAuxiliar(const ComportamientoAuxiliar &comport) : Comportamiento(comport) {}
   ~ComportamientoAuxiliar() {}
@@ -62,7 +62,9 @@ private:
 
   static const unordered_set<char> CASILLAS_NO_TRANSITABLES; // Conjunto de casillas no transitables
 
-  list<Action> plan; // Lista de acciones que forman el camino a seguir
+  vector<Action> plan;  // Lista de acciones que forman el camino a seguir
+  int numEnPlan;        // Número de la acción en el plan que se está ejecutando
+  static const int MAYOR_COSTE = 5;
 
 
   /**
@@ -103,7 +105,7 @@ private:
   struct Nodo{
     Estado estado;	// Estado del nodo
     int gastoEnergia;	// Gasto de energía al nodo
-    list<Action> acciones;	// Acciones que se han realizado para llegar al nodo
+    vector<Action> acciones;	// Acciones que se han realizado para llegar al nodo
 
     bool operator<(const Nodo & otro) const {
       return estado < otro.estado;
@@ -115,6 +117,18 @@ private:
   };
   
   // Métodos Privados
+
+
+  /**
+   * @brief Método que determina la casilla más interesante a la que se puede mover el rescatador (dentro de las empatadas)
+   * 
+   * @param casillasEmpatadas  Conjunto de casillas empatadas.
+   * @param sensores  Estructura de datos que contiene la información de los sensores.
+   * 
+   * @return  Número de la casilla más interesante a la que se puede mover el rescatador (dentro de las empatadas)
+   */
+  int determinaEmpatadas(vector<int> &casillasEmpatadas, const Sensores & sensores);
+
 
   /**
    * @brief Método que determina la casilla más interesante a la que se puede mover el rescatador.
@@ -232,7 +246,7 @@ private:
    * 
    * @return  Lista de acciones a seguir para llegar al destino.
    */
-  list<Action> A_Estrella(const Estado& origen, int filDestino, int colDestino);
+  vector<Action> A_Estrella(const Estado& origen, int filDestino, int colDestino);
   
   /**
    * @brief Método que calcula el gasto de energía al realizar una acción.
@@ -255,7 +269,7 @@ private:
    * @param origen  Estado inicial del agente.
    * @param plan    Lista de acciones a seguir.
    */
-  void VisualizaPlan(const Estado& origen, const list<Action>& plan);
+  void VisualizaPlan(const Estado& origen, const vector<Action>& plan);
 };
 
 #endif
