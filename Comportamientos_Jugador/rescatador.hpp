@@ -37,6 +37,9 @@ public:
     puestosBase = set<pair<int, int>>();
 
     enDestino = false;
+    plan= vector<Action>();
+    numEnPlan = 0;
+    nextPos = make_pair(-1, -1);
   }
   ComportamientoRescatador(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
@@ -76,7 +79,8 @@ private:
   int numEnPlan;       // Número de la acción en el plan que se está ejecutando
 
   set<pair<int, int>> puestosBase; // Conjunto de puestos base que ha encontrado el rescatador
-  bool enDestino; // Indica si el rescatador ha llegado a su destino
+  bool enDestino;                   // Indica si el rescatador ha llegado a su destino
+  pair<int, int> nextPos;           // Posición a la que se quiere mover el agente
 
 
 
@@ -168,17 +172,17 @@ private:
   /**
    * @brief Método que determina si la casilla es accesible o no.
    * 
-   * @param estadoReal  Estado real del agente.
    * @param estado  Estado del agente.
    * @param comprobarAltura  Indica si se debe comprobar la altura de la casilla.
    * @param comprobarAgentes  Indica si se debe comprobar que no hay agentes en la casilla.
    * @param casilla  Número de la casilla.
+   * @param aEvitar  Conjunto de casillas a evitar.
    * 
    * @pre No se comprueban agentes
    * 
    * @return  true si la casilla es accesible, false en caso contrario.
    */
-  bool casillaAccesible(const Estado& estadoReal, const Estado& estado, bool comprobarAltura, int casilla);
+  bool casillaAccesible(const Estado& estado, bool comprobarAltura, int casilla, const set<pair<int, int>>& aEvitar);
 
   /**
    * @brief Método que determina si la casilla es accesible o no.
@@ -202,8 +206,10 @@ private:
    * @param mCotas     Mapa de cotas del agente.
    * @param mEntidades  Mapa de entidades del agente.
    * @param sensores   Estructura de datos que contiene la información de los sensores.
+   * 
+   * @return true si se ha actualizado alguna casilla, false en caso contrario.
    */
-  void situarSensorEnMapa(vector<vector<unsigned char>> &mResultado, 
+  bool situarSensorEnMapa(vector<vector<unsigned char>> &mResultado, 
                           vector<vector<unsigned char>> &mCotas,
                           vector<vector<unsigned char>> &mEntidades,
                           Sensores sensores);
@@ -240,11 +246,13 @@ private:
   /**
    * @brief Método que devuelve el estado del agente después de ejecutar una acción.
    * 
-   * @param estadoReal  Estado real del agente.
    * @param action  Acción a ejecutar.
    * @param inicio  Estado inicial del agente.
+   * @param aEvitar  Conjunto de casillas a evitar.
+   * 
+   * @return  Un par que contiene el nuevo estado del agente y un booleano que indica si la acción se ha ejecutado o no.
    */
-  Estado ejecutarAccion(const Estado& estadoReal, Action action, const Estado & inicio);
+  pair<Estado, bool> ejecutarAccion(Action action, const Estado & inicio, const set<pair<int, int>>& aEvitar=set<pair<int, int>>());
 
   /**
    * @brief Método que implementa el algoritmo de Dijkstra para encontrar el camino más corto.
@@ -252,10 +260,11 @@ private:
    * @param origen  Estado de origen.
    * @param filDestino  Fila de la casilla destino.
    * @param colDestino  Columna de la casilla destino.
+   * @param aEvitar  Conjunto de casillas a evitar.
    * 
    * @return  Lista de acciones a seguir para llegar al destino.
    */
-  vector<Action> Dijkstra(const Estado& origen, int filDestino, int colDestino);
+  vector<Action> Dijkstra(const Estado& origen, int filDestino, int colDestino, const set<pair<int, int>>& aEvitar=set<pair<int, int>>());
   
   /**
    * @brief Método que calcula el gasto de energía al realizar una acción.
@@ -317,6 +326,12 @@ private:
    * @param casillasPermitidas  Conjunto de casillas permitidas pisar. Solo se usa si hayLimitacion es true.
    */
   int buscaCasilla(const Sensores& sensores, char tipo, bool hayLimitacion, set<char> casillasPermitidas=set<char>());
+
+  
+  /**
+   * @brief Método que reinicializa el plan de acciones a seguir.
+   */
+  void reseteaPlan();
 
 };
 

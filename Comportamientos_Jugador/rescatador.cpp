@@ -180,20 +180,25 @@ pair<int, int> ComportamientoRescatador::aCoordenadas(int filAgente, int colAgen
 
 
 
-void ComportamientoRescatador::situarSensorEnMapa(
+bool ComportamientoRescatador::situarSensorEnMapa(
 	vector<vector<unsigned char>> &mResultado, 
 	vector<vector<unsigned char>> &mCotas,
 	vector<vector<unsigned char>> &mEntidades,
 	Sensores sensores)
 {	
+	bool nuevaDescubierta = false;
 	for (int i=0; i<NUM_CASILLAS; ++i){
 		int fil, col;
 		tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
+
+		nuevaDescubierta |= (mResultado.at(fil).at(col) == '?'); 
 		
 		mResultado.at(fil).at(col) = sensores.superficie.at(i);
 		mCotas.at(fil).at(col) = sensores.cota.at(i);
 		mEntidades.at(fil).at(col) = sensores.agentes.at(i);
 	}
+
+	return nuevaDescubierta;
 }
 
 void ComportamientoRescatador::reinicializarVeces_VistaVisitada(){
@@ -215,11 +220,10 @@ void ComportamientoRescatador::actualizarMatrices_VistasVisitadas(const Sensores
 	}
 }
 
-bool ComportamientoRescatador::casillaAccesible(const Estado& estadoReal, const Estado& estado, bool comprobarAltura, int casilla)
+bool ComportamientoRescatador::casillaAccesible(const Estado& estado, bool comprobarAltura, int casilla, const set<pair<int, int>>& aEvitar)
 {	
-	// Tan solo comprobamos agentes si lo que vemos sabemos que es real
-	bool comprobarAgentes = estadoReal == estado;
-	return casillaAccesible(estado.fil, estado.col, estado.orientacion, estado.tieneZapatillas, comprobarAgentes, comprobarAltura, casilla);
+	bool permitida = aEvitar.find(aCoordenadas(estado.fil, estado.col, estado.orientacion, casilla)) == aEvitar.end();
+	return permitida && casillaAccesible(estado.fil, estado.col, estado.orientacion, estado.tieneZapatillas, false, comprobarAltura, casilla);
 }
 
 bool ComportamientoRescatador::casillaAccesible(const Sensores& sensores, bool comprobarAltura, int casilla)
@@ -233,21 +237,24 @@ bool ComportamientoRescatador::casillaAccesible(int filAgente, int colAgente, Or
 	// 1. No es un precipicio
 	// 2. La diferencia de altura entre la casilla y la cota del rescatador es <= 1
 	// 3. Si el rescatador tiene zapatillas, la diferencia de altura puede ser <= 2
+	
 	int fil, col;
 	tie(fil, col) = aCoordenadas(filAgente, colAgente, orientacion, casilla);
+
 	
 	bool accesible = 0<= fil && fil < mapaResultado.size() && 0<=col && col<mapaResultado.at(0).size();
 	if (accesible && comprobarAgentes && mapaResultado.at(fil).at(col) != '?'){
 		// Esta línea se asegura de que alguna vez la ha visto
 		accesible &= mapaEntidades.at(fil).at(col) == '_'; // No hay agentes en la casilla
 	}
+
 	// Comprobamos que es transitable
 	accesible = accesible && CASILLAS_NO_TRANSITABLES.find(mapaResultado.at(fil).at(col)) == CASILLAS_NO_TRANSITABLES.end();
 	if (accesible && comprobarAltura && mapaResultado.at(fil).at(col) != '?'){
 		int dif = abs(mapaCotas.at(filAgente).at(colAgente) - mapaCotas.at(fil).at(col));
 		accesible &= (dif<=1 || (conZapatillas && dif <=2));
 	}
-
+	
 	return accesible;
 }
 
@@ -514,14 +521,16 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_1(Sensores sensor
 
 // -----------------------------------------------------------------------------
 
-ComportamientoRescatador::Estado ComportamientoRescatador::ejecutarAccion(const Estado& estadoReal, Action action, const Estado & inicio){
+pair<ComportamientoRescatador::Estado, bool> ComportamientoRescatador::ejecutarAccion(Action action, const Estado & inicio, const set<pair<int, int>>& aEvitar){
 
 	Estado nuevoEstado = inicio;
 
+
 	switch (action){
 		case Action::RUN:
-			if (casillaAccesible(estadoReal, inicio, false, 2) && casillaAccesible(estadoReal, inicio, true, 6))
+			if (casillaAccesible(inicio, false, 2, aEvitar) && casillaAccesible(inicio, true, 6, aEvitar)){
 				tie(nuevoEstado.fil, nuevoEstado.col) = aCoordenadas(inicio.fil, inicio.col, inicio.orientacion, 6);
+			}
 			break;
 		case Action::TURN_SR:
 			nuevoEstado.orientacion = (Orientacion)(((int)inicio.orientacion + 1) % 8);
@@ -530,13 +539,14 @@ ComportamientoRescatador::Estado ComportamientoRescatador::ejecutarAccion(const 
 			nuevoEstado.orientacion = (Orientacion)((8+(int)inicio.orientacion - 2) % 8);
 			break;
 		case Action::WALK:
-			if (casillaAccesible(estadoReal, inicio, true, 2))
+			if (casillaAccesible(inicio, true, 2, aEvitar)){
 				tie(nuevoEstado.fil, nuevoEstado.col) = aCoordenadas(inicio.fil, inicio.col, inicio.orientacion, 2);
+			}
 			
 			break;
 	}
 	
-	return nuevoEstado;
+	return make_pair(nuevoEstado, !(nuevoEstado == inicio));
 }
 
 
@@ -544,14 +554,13 @@ ComportamientoRescatador::Estado ComportamientoRescatador::ejecutarAccion(const 
 vector<Action> ComportamientoRescatador::Dijkstra(
 	const Estado &origen,
 	int filDestino,
-	int colDestino)
+	int colDestino,
+	const set<pair<int, int>>& aEvitar)
 {
 
 	// Acciones posibles del agente
 	const vector<Action> acciones = {Action::RUN, Action::WALK, Action::TURN_SR, Action::TURN_L};
 
-	const int INVALID = -1;	// Como no hay un valor máximo, ponemos un valor imposible
-	
 
 	// Cola con prioridad formada por Nodos. Ordenada por el gasto de Energia al nodo Origen
 	struct Comparador {
@@ -600,13 +609,15 @@ vector<Action> ComportamientoRescatador::Dijkstra(
 
 			// Exploramos los nodos resultantes de aplicar cada una de las acciones
 			Nodo nuevoNodo;
+			bool ejecutada;
 
 			for (auto it = acciones.begin(); it != acciones.end(); ++it){
-				
-				nuevoNodo.estado = ejecutarAccion(origen, *it, nodoActual.estado);
 
-				// Comprobamos que se ha generado un nodo nuevo
-				if (visitados.find(nuevoNodo) == visitados.end()){
+				tie(nuevoNodo.estado, ejecutada) = ejecutarAccion(*it, nodoActual.estado, aEvitar);
+
+				// Comprobamos que se ha generado un nodo nuevo.
+				// Es necesario comprobar ambas, porque puede ser que se haya ejecutado pero haya llegado a uno conocido
+				if (ejecutada && visitados.find(nuevoNodo) == visitados.end()){
 					
 					// Modificamos el gasto de energía del nuevo nodo
 					nuevoNodo.gastoEnergia = nodoActual.gastoEnergia + gastoAccion(*it, nodoActual.estado.fil, nodoActual.estado.col, nuevoNodo.estado.fil, nuevoNodo.estado.col);
@@ -645,7 +656,7 @@ void ComportamientoRescatador::VisualizaPlan(const Estado& origen, const vector<
 
 	for(auto it = plan.begin(); it != plan.end(); ++it){
 
-		estadoActual = ejecutarAccion(origen, *it, estadoActual);
+		estadoActual = ejecutarAccion(*it, estadoActual).first;
 
 		if (!estadoActual.tieneZapatillas && mapaResultado.at(estadoActual.fil).at(estadoActual.col) == 'D')
 			estadoActual.tieneZapatillas = true;
@@ -781,10 +792,8 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_2(Sensores sensor
 		++numEnPlan;
 
 		// Si hemos terminado el plan, lo reinicializamos
-		if (numEnPlan >= plan.size()){
-			numEnPlan = 0;
-			plan.clear();
-		}
+		if (numEnPlan >= plan.size())
+			reseteaPlan();
 	}
 
 	lastAction = accion;	// Actualizamos la última acción realizada
@@ -814,17 +823,17 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_4(Sensores sensor
 	Action accion= IDLE;
 
 	// Actualización de variables de estado.
-	situarSensorEnMapa(mapaResultado, mapaCotas, mapaEntidades, sensores);
+	bool nuevasDescubiertas = situarSensorEnMapa(mapaResultado, mapaCotas, mapaEntidades, sensores);
 	actualizaPuestosBase(sensores);
 	if (!tieneZapatillas && sensores.superficie.at(0) == 'D')
 		tieneZapatillas = true;
-
 	int destinoF = sensores.destinoF;
 	int destinoC = sensores.destinoC;
 
+
 	if (!enDestino && sensores.posF == destinoF && sensores.posC == destinoC){
 
-		// Acabamos de llegar al destino
+		// Acabamos de llegar al destino y permanecemos en él
 		enDestino = true;
 		if (sensores.gravedad)
 			accion = Action::CALL_ON;
@@ -834,16 +843,16 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_4(Sensores sensor
 		enDestino = false;
 	}
 
-
 	// Buscamos zapatillas al alrededor del agente
 	if (accion == Action::IDLE && !tieneZapatillas){
 		int res = buscaCasilla(sensores, 'D', false);
-		if (res != 0)
+		if (res != 0){
 			accion = comoLlegarA(res);
+			reseteaPlan();
+		}
 	}
 
-
-	if (accion == Action::IDLE){
+	if (accion == Action::IDLE && !enDestino){
 		// Inicializamos el nodo origen
 		Estado origen;
 		origen.fil = sensores.posF;
@@ -851,10 +860,54 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_4(Sensores sensor
 		origen.orientacion = sensores.rumbo;
 		origen.tieneZapatillas = tieneZapatillas;
 
-		plan = Dijkstra(origen, sensores.destinoF, sensores.destinoC);
-		VisualizaPlan(origen, plan);
-		if (!plan.empty())
-			accion = *plan.begin();
+		// Casillas a evitar. En este caso, las que se ven que están ocupadas
+		set<pair<int, int>> aEvitar;
+		for (int i=1; i<NUM_CASILLAS; ++i){
+			int fil, col;
+			tie(fil, col) = aCoordenadas(origen.fil, origen.col, origen.orientacion, i);
+			if (mapaEntidades.at(fil).at(col) != '_')
+				aEvitar.insert(make_pair(fil, col));
+		}
+
+
+		#ifdef DEBUG_RESC
+		cout << "Evitar: " << endl;
+		for (auto it = aEvitar.begin(); it != aEvitar.end(); ++it){
+			cout << "- (" << it->first << "," << it->second << ")" << endl;
+		}
+		#endif
+
+		bool recalcular = nuevasDescubiertas;
+		cout << "---------------------------------" << endl;
+		if (recalcular) cout << "Recalcular0" << endl;
+		recalcular |= plan.empty();
+		if (recalcular) cout << "Recalcular1" << endl;
+		
+		// Control de los empujes
+		recalcular |= nextPos != make_pair(sensores.posF, sensores.posC);
+		if (recalcular) cout << "Recalcular2" << endl;
+
+		// Control de la acción ejecutada
+		recalcular = recalcular || !ejecutarAccion(plan.at(numEnPlan), origen, aEvitar).second;
+		if (recalcular) cout << "Recalcular3" << endl;
+
+		if (recalcular){
+			reseteaPlan();
+			plan = Dijkstra(origen, sensores.destinoF, sensores.destinoC, aEvitar);
+			VisualizaPlan(origen, plan);
+		}
+
+		if (!plan.empty() && numEnPlan < plan.size()){
+			accion = plan.at(numEnPlan);
+			++numEnPlan;
+
+			if (numEnPlan >= plan.size())
+				reseteaPlan();
+			
+		}
+
+		Estado nextEstado = ejecutarAccion(accion, origen, aEvitar).first;
+		nextPos = make_pair(nextEstado.fil, nextEstado.col);
 	}
 
 
@@ -1010,4 +1063,12 @@ vector<int> ComportamientoRescatador::getCasillasAccesibles(const Sensores & sen
 	#endif
 
 	return casillasAccesibles;
+}
+
+
+void ComportamientoRescatador::reseteaPlan()
+{
+	plan.clear();
+	numEnPlan = 0;
+	VisualizaPlan(Estado(), plan);
 }
