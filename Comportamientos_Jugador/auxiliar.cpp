@@ -34,7 +34,7 @@ Action ComportamientoAuxiliar::think(Sensores sensores)
 		accion = ComportamientoAuxiliarNivel_3 (sensores);
 		break;
 	case 4:
-		// accion = ComportamientoAuxiliarNivel_4 (sensores);
+		accion = ComportamientoAuxiliarNivel_4 (sensores);
 		break;
 	}
 
@@ -240,18 +240,16 @@ bool ComportamientoAuxiliar::casillaAccesible(int filAgente, int colAgente, Orie
 	// 2. La diferencia de altura entre la casilla y la cota del rescatador es <= 1
 	int fil, col;
 	tie(fil, col) = aCoordenadas(filAgente, colAgente, orientacion, casilla);
+	bool accesible = 0<= fil && fil < mapaResultado.size() && 0<=col && col<mapaResultado.at(0).size();
 
-	bool accesible = true;
-	
-	if (comprobarAgentes)
+	if (accesible && comprobarAgentes)
 		// Esta línea se asegura de que alguna vez la ha visto
 		accesible &= mapaEntidades.at(fil).at(col) == '_'; // No hay agentes en la casilla
-
-	accesible &= CASILLAS_NO_TRANSITABLES.find(mapaResultado.at(fil).at(col)) == CASILLAS_NO_TRANSITABLES.end() || (conZapatillas && mapaResultado.at(fil).at(col) == 'B');
-
-	
-	int dif = abs(mapaCotas.at(filAgente).at(colAgente) - mapaCotas.at(fil).at(col));
-	accesible &= dif<=1;
+	accesible = accesible && (CASILLAS_NO_TRANSITABLES.find(mapaResultado.at(fil).at(col)) == CASILLAS_NO_TRANSITABLES.end() || (conZapatillas && mapaResultado.at(fil).at(col) == 'B'));
+	if (accesible && mapaResultado.at(fil).at(col) != '?'){
+		int dif = abs(mapaCotas.at(filAgente).at(colAgente) - mapaCotas.at(fil).at(col));
+		accesible &= dif<=1;
+	}
 
 	return accesible;
 }
@@ -319,58 +317,25 @@ int ComportamientoAuxiliar::determinaEmpatadas(vector<int> &casillasEmpatadas, c
 int ComportamientoAuxiliar::veoCasillaInteresante(const Sensores & sensores){
 
 	// Tipos de casillas permitidas
-	vector<char> tiposCasillasPermitidas = {'X', 'D', 'C'}; // X: puesto base, D: zapatillas, C: camino
+	set<char> tiposCasillasPermitidas = {'X', 'D', 'C'}; // X: puesto base, D: zapatillas, C: camino
 	if (sensores.nivel == 1)
-		tiposCasillasPermitidas.push_back('S');
+		tiposCasillasPermitidas.insert('S');
 
-	// Obtenemos las casillas accesibles ***SOLO POR CAMINOS***
-	// Casilla Alcanzable: Casilla que puedo alcanzar (posiblemente no pueda acceder)
-	// Casilla Accesible: Casilla que puedo alcanzar y es accesible
-
-	// El orden de las casillas es relevante para hacer el mínimo número de pasos. Lo buscado: 6 8 4 2 3 1 -4 -5 -2 -4
-	const vector<int> casillasAlcanzables	= {2,3,1, -4, -2};
-	vector<int> casillasAccesibles;
-	int fil,col;
-
-
-	for (auto i = casillasAlcanzables.begin(); i != casillasAlcanzables.end(); ++i){
-		if (casillaAccesible(sensores, *i)){
-			tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
-			bool permitida = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
-			if (permitida)
-				casillasAccesibles.push_back(*i);
-		}
-	}
-
-	#ifdef DEBUG_AUX
-	cout << "Casillas accesibles: " << endl;
-	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
-		tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
-		cout << "(" << fil << "," << col << ") " << mapaResultado.at(fil).at(col) << " " << *i << endl;
-	}
-	#endif
-
+	// Buscamos las casillas accesibles
+	vector<int> casillasAccesibles = getCasillasAccesibles(sensores, true, tiposCasillasPermitidas);
 
 
 	// Buscamos la casilla más interesante a la que ir
 	int res = 0;	// Por defecto no veo nada interesante
 
 	// Buscamos primero el puesto base
-	if (sensores.nivel == 0){
-		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
-			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
-			if (mapaResultado.at(fil).at(col) == 'X')
-				res = *i;
-		}
-	}
+	if (sensores.nivel == 0)
+		res = buscaCasilla(sensores, 'X', true, tiposCasillasPermitidas);
+	
 	
 	// Si no hay puesto base, miro si hay zapatillas
 	if (!tieneZapatillas){
-		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
-			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
-			if (mapaResultado.at(fil).at(col) == 'D')
-				res = *i;
-		}
+		res = buscaCasilla(sensores, 'D', true, tiposCasillasPermitidas);
 	}
 			
 	
@@ -460,33 +425,8 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_0(Sensores sensores)
 		--num_TURN_SR_Restantes;
 	}
 	else{ // Vamos a realizar el movimiento determinado por lo que veo
-
 		int res = veoCasillaInteresante(sensores);
-		switch (res){
-			case 1: // TURN_SL
-				action = Action::TURN_SR;
-				num_TURN_SR_Restantes = 6; // 8 giros es permanecer constante, 8-1 en total. -1 pq ya realiza uno en esta iteracion
-				break;
-			case 2: // WALK
-				action = Action::WALK;
-				break;
-			case 3: // TURN_SR
-				action = Action::TURN_SR;
-				break;
-			case -2: // TURN_L
-				action = Action::TURN_SR;
-				num_TURN_SR_Restantes = 5; // 6 a realizar. -1 pq ya realiza uno en esta iteracion
-				break;
-			case -4: // TURN_R
-				action = Action::TURN_SR;
-				num_TURN_SR_Restantes = 1; // 2 a realizar. -1 pq ya realiza uno en esta iteracion
-				break;
-			default: // No veo nada interesante, TURN_R
-				action = Action::TURN_SR;
-				num_TURN_SR_Restantes = 1; // 2 a realizar. -1 pq ya realiza uno en esta iteracion
-				break;
-		}
-
+		action = comoLlegarA(res);
 	}
 
 	lastAction = action;	// Actualizamos la última acción realizada
@@ -546,10 +486,6 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_1(Sensores sensores)
 
 	}
 
-	if (sensores.energia < 100){
-		cout << "Queda poca energia Aux: " << sensores.energia << endl;
-	}
-
 	lastAction = action;	// Actualizamos la última acción realizada
 	return action;
 }
@@ -576,8 +512,9 @@ ComportamientoAuxiliar::Estado ComportamientoAuxiliar::ejecutarAccion(Action act
 			nuevoEstado.orientacion = (Orientacion)(((int)inicio.orientacion + 1) % 8);
 			break;
 		case Action::WALK:
-			if (casillaAccesible(inicio, 2))
+			if (casillaAccesible(inicio, 2)){
 				tie(nuevoEstado.fil, nuevoEstado.col) = aCoordenadas(inicio.fil, inicio.col, inicio.orientacion, 2);
+			}
 			break;
 	}
 	
@@ -587,7 +524,10 @@ ComportamientoAuxiliar::Estado ComportamientoAuxiliar::ejecutarAccion(Action act
 
 int ComportamientoAuxiliar::gastoAccion(Action action, int filInicio, int colInicio, int filDestino, int colDestino){
 	int gasto=0;
-	int difAltura = mapaCotas.at(filDestino).at(colDestino) - mapaCotas.at(filInicio).at(colInicio);
+	int difAltura=-1;	// Si no es reconocida, fomentamos que vaya ahí
+	if (mapaResultado.at(filInicio).at(colInicio) != '?')
+		difAltura = mapaCotas.at(filDestino).at(colDestino) - mapaCotas.at(filInicio).at(colInicio);
+	
 	if (difAltura > 0)
 		difAltura = 1;
 	else if (difAltura < 0)
@@ -687,7 +627,6 @@ vector<Action> ComportamientoAuxiliar::A_Estrella(
 
 
 
-
 	bool caminoOptimoEncontrado = false;
 	while(!frontera.empty() && !caminoOptimoEncontrado){
 
@@ -711,10 +650,8 @@ vector<Action> ComportamientoAuxiliar::A_Estrella(
 			// Exploramos los nodos resultantes de aplicar cada una de las acciones
 			Nodo nuevoNodo;
 
-
 			for (auto it = acciones.begin(); it != acciones.end(); ++it){
 				nuevoNodo.estado = ejecutarAccion(*it, nodoActual.estado);
-
 				// Comprobamos que se ha generado un nodo nuevo
 				if (visitados.find(nuevoNodo) == visitados.end()){
 
@@ -723,7 +660,6 @@ vector<Action> ComportamientoAuxiliar::A_Estrella(
 												+ gastoAccion(*it, nodoActual.estado.fil, nodoActual.estado.col, nuevoNodo.estado.fil, nuevoNodo.estado.col);
 					nuevoNodo.acciones = nodoActual.acciones;
 					nuevoNodo.acciones.push_back(*it);
-					
 
 					// Añadimos el nuevo nodo a la frontera (podrá estar ya, pero podemos haber encontrado un camino mejor)
 					frontera.push(nuevoNodo);
@@ -772,6 +708,9 @@ void ComportamientoAuxiliar::VisualizaPlan(const Estado& origen, const vector<Ac
 Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_3(Sensores sensores)
 {
 	Action accion= IDLE;
+	// Actualización de variables de estado.
+	situarSensorEnMapa(mapaResultado, mapaCotas, mapaEntidades, sensores);
+	
 	if (plan.empty() && (sensores.posF != sensores.destinoF || sensores.posC != sensores.destinoC)){
 
 
@@ -802,8 +741,150 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_3(Sensores sensores)
 	return accion;
 }
 
+void ComportamientoAuxiliar::actualizaPuestosBase(const Sensores& sensores)
+{	
+	for (int i=0; i<NUM_CASILLAS; ++i)
+		if(sensores.superficie.at(i) == 'X'){
+			int fil, col;
+			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
+
+			puestosBase.insert(make_pair(fil, col));
+		}
+}
+
 Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_4(Sensores sensores)
 {
-	Action action = IDLE;	// Acción por defecto.
+	Action accion= IDLE;
+
+
+	// Actualización de variables de estado.
+	situarSensorEnMapa(mapaResultado, mapaCotas, mapaEntidades, sensores);
+	actualizaPuestosBase(sensores);
+	if (!tieneZapatillas && sensores.superficie.at(0) == 'D')
+		tieneZapatillas = true;
+
+
+	// Buscamos zapatillas al alrededor del agente
+	if (accion == Action::IDLE && !tieneZapatillas){
+		int res = buscaCasilla(sensores, 'D', false);
+		if (res != 0)
+			accion = comoLlegarA(res);
+	}
+
+	if (accion == Action::IDLE){
+		// Tan solo se moverá si tiene un destino válido
+		if (0 <= sensores.destinoF && sensores.destinoF < mapaResultado.size() &&
+			0 <= sensores.destinoC && sensores.destinoC < mapaResultado.at(0).size()){
+				// Inicializamos el nodo origen
+				Estado origen;
+				origen.fil = sensores.posF;
+				origen.col = sensores.posC;
+				origen.orientacion = sensores.rumbo;
+				origen.tieneZapatillas = tieneZapatillas;
+
+				plan = A_Estrella(origen, sensores.destinoF, sensores.destinoC);
+				VisualizaPlan(origen, plan);
+				if (!plan.empty())
+					accion = *plan.begin();
+			}
+	}
+
+	
+	if (lastAction == Action::IDLE){
+		mapaConPlan.clear();
+		mapaConPlan.resize(mapaResultado.size(), vector<unsigned char>(mapaResultado.at(0).size(), 0));
+	}
+	
+
+
+	lastAction = accion;	// Actualizamos la última acción realizada
+	return accion;
+}
+
+
+
+int ComportamientoAuxiliar::buscaCasilla(const Sensores& sensores, char tipo, bool hayLimitacion, set<char> casillasPermitidas){
+
+	int res=0;
+	int fil, col;
+
+	vector<int> casillasAccesibles = getCasillasAccesibles(sensores, hayLimitacion, casillasPermitidas);
+	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
+		tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+		if (mapaResultado.at(fil).at(col) == tipo)
+			res = *i;
+	}
+
+	return res;
+}
+
+
+Action ComportamientoAuxiliar::comoLlegarA(int casilla){
+	Action action;
+
+	switch (casilla){
+		case 1: // TURN_SL
+			action = Action::TURN_SR;
+			num_TURN_SR_Restantes = 6; // 8 giros es permanecer constante, 8-1 en total. -1 pq ya realiza uno en esta iteracion
+			break;
+		case 2: // WALK
+			action = Action::WALK;
+			break;
+		case 3: // TURN_SR
+			action = Action::TURN_SR;
+			break;
+		case -2: // TURN_L
+			action = Action::TURN_SR;
+			num_TURN_SR_Restantes = 5; // 6 a realizar. -1 pq ya realiza uno en esta iteracion
+			break;
+		case -4: // TURN_R
+			action = Action::TURN_SR;
+			num_TURN_SR_Restantes = 1; // 2 a realizar. -1 pq ya realiza uno en esta iteracion
+			break;
+		default: // No veo nada interesante, TURN_R
+			action = Action::TURN_SR;
+			num_TURN_SR_Restantes = 1; // 2 a realizar. -1 pq ya realiza uno en esta iteracion
+			break;
+	}
+	
 	return action;
+}
+
+
+
+vector<int> ComportamientoAuxiliar::getCasillasAccesibles(const Sensores & sensores, bool hayLimitacion, const set<char> &casillasPermitidas){
+
+	// Obtenemos las casillas accesibles ***SOLO POR CAMINOS***
+	// Casilla Alcanzable: Casilla que puedo alcanzar (posiblemente no pueda acceder)
+	// Casilla Accesible: Casilla que puedo alcanzar y es accesible
+
+	// El orden de las casillas es relevante para hacer el mínimo número de pasos. Lo buscado: 6 8 4 2 3 1 -4 -5 -2 -4
+	const vector<int> casillasAlcanzables	= {2,3,1, -4, -2};
+	vector<int> casillasAccesibles;
+	int fil,col;
+
+
+	for (auto i = casillasAlcanzables.begin(); i != casillasAlcanzables.end(); ++i){
+		if (casillaAccesible(sensores, *i)){
+
+			bool aniade = true;
+			if (hayLimitacion){
+				tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+				aniade = find(casillasPermitidas.begin(), casillasPermitidas.end(), mapaResultado.at(fil).at(col)) != casillasPermitidas.end();
+			}
+			
+			if (aniade)
+				casillasAccesibles.push_back(*i);
+		}
+	}
+
+	#ifdef DEBUG_AUX
+	cout << "Casillas accesibles: " << endl;
+	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
+		tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+		cout << "(" << fil << "," << col << ") " << mapaResultado.at(fil).at(col) << " " << *i << endl;
+	}
+	#endif
+
+	return casillasAccesibles;
 }

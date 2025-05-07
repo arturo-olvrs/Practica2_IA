@@ -32,6 +32,11 @@ public:
     vector<int> fila(size, 0);
     numVecesVisitada.resize(size, fila);
     numVecesVista.resize(size, fila);
+
+    // Inicializar el conjunto de puestos base
+    puestosBase = set<pair<int, int>>();
+
+    enDestino = false;
   }
   ComportamientoRescatador(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
@@ -69,6 +74,9 @@ private:
 
   vector<Action> plan; // Lista de acciones que forman el camino a seguir
   int numEnPlan;       // Número de la acción en el plan que se está ejecutando
+
+  set<pair<int, int>> puestosBase; // Conjunto de puestos base que ha encontrado el rescatador
+  bool enDestino; // Indica si el rescatador ha llegado a su destino
 
 
 
@@ -160,15 +168,17 @@ private:
   /**
    * @brief Método que determina si la casilla es accesible o no.
    * 
+   * @param estadoReal  Estado real del agente.
    * @param estado  Estado del agente.
    * @param comprobarAltura  Indica si se debe comprobar la altura de la casilla.
+   * @param comprobarAgentes  Indica si se debe comprobar que no hay agentes en la casilla.
    * @param casilla  Número de la casilla.
    * 
    * @pre No se comprueban agentes
    * 
    * @return  true si la casilla es accesible, false en caso contrario.
    */
-  bool casillaAccesible(const Estado& estado, bool comprobarAltura, int casilla);
+  bool casillaAccesible(const Estado& estadoReal, const Estado& estado, bool comprobarAltura, int casilla);
 
   /**
    * @brief Método que determina si la casilla es accesible o no.
@@ -230,10 +240,11 @@ private:
   /**
    * @brief Método que devuelve el estado del agente después de ejecutar una acción.
    * 
+   * @param estadoReal  Estado real del agente.
    * @param action  Acción a ejecutar.
    * @param inicio  Estado inicial del agente.
    */
-  Estado ejecutarAccion(Action action, const Estado & inicio);
+  Estado ejecutarAccion(const Estado& estadoReal, Action action, const Estado & inicio);
 
   /**
    * @brief Método que implementa el algoritmo de Dijkstra para encontrar el camino más corto.
@@ -268,6 +279,44 @@ private:
    * @param plan    Lista de acciones a seguir.
    */
   void VisualizaPlan(const Estado& origen, const vector<Action>& plan);
+
+  
+  /**
+   * @brief Método que actualiza la variable privada puestosBase.
+   * 
+   * @param sensores  Estructura de datos que contiene la información de los sensores.
+   */
+  void actualizaPuestosBase(const Sensores& sensores);
+
+
+  /**
+   * @brief Método que devuelve las casillas accesibles.
+   * 
+   * @param sensores  Estructura de datos que contiene la información de los sensores.
+   * @param hayLimitacion  Indica si hay limitación de las casillas que se pueden visitar.
+   * @param casillasPermitidas  Conjunto de casillas permitidas pisar. Solo se usa si hayLimitacion es true.
+   * 
+   * @return  Lista de casillas accesibles.
+   */
+  vector<int> getCasillasAccesibles(const Sensores & sensores, bool hayLimitacion, const set<char> &casillasPermitidas=set<char>());
+
+  
+  /**
+   * @brief Método que devuelve la acción a realizar para llegar a una casilla.
+   * 
+   * @param casilla  Número de la casilla a la que se quiere llegar.
+   */
+  Action comoLlegarA(int casilla);
+
+  /**
+   * @brief Método que busca al alrededor del agente una casilla de un tipo determinado.
+   * 
+   * @param Sensores  Estructura de datos que contiene la información de los sensores.
+   * @param tipo  Tipo de casilla a buscar.
+   * @param hayLimitacion  Indica si hay limitación de las casillas que se pueden visitar.
+   * @param casillasPermitidas  Conjunto de casillas permitidas pisar. Solo se usa si hayLimitacion es true.
+   */
+  int buscaCasilla(const Sensores& sensores, char tipo, bool hayLimitacion, set<char> casillasPermitidas=set<char>());
 
 };
 

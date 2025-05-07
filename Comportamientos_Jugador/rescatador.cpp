@@ -36,7 +36,7 @@ Action ComportamientoRescatador::think(Sensores sensores)
 		accion = ComportamientoRescatadorNivel_3 (sensores);
 		break;
 	case 4:
-		// accion = ComportamientoRescatadorNivel_4 (sensores);
+		accion = ComportamientoRescatadorNivel_4 (sensores);
 		break;
 	}
 
@@ -215,9 +215,11 @@ void ComportamientoRescatador::actualizarMatrices_VistasVisitadas(const Sensores
 	}
 }
 
-bool ComportamientoRescatador::casillaAccesible(const Estado& estado, bool comprobarAltura, int casilla)
-{
-	return casillaAccesible(estado.fil, estado.col, estado.orientacion, estado.tieneZapatillas, false, comprobarAltura, casilla);
+bool ComportamientoRescatador::casillaAccesible(const Estado& estadoReal, const Estado& estado, bool comprobarAltura, int casilla)
+{	
+	// Tan solo comprobamos agentes si lo que vemos sabemos que es real
+	bool comprobarAgentes = estadoReal == estado;
+	return casillaAccesible(estado.fil, estado.col, estado.orientacion, estado.tieneZapatillas, comprobarAgentes, comprobarAltura, casilla);
 }
 
 bool ComportamientoRescatador::casillaAccesible(const Sensores& sensores, bool comprobarAltura, int casilla)
@@ -233,17 +235,15 @@ bool ComportamientoRescatador::casillaAccesible(int filAgente, int colAgente, Or
 	// 3. Si el rescatador tiene zapatillas, la diferencia de altura puede ser <= 2
 	int fil, col;
 	tie(fil, col) = aCoordenadas(filAgente, colAgente, orientacion, casilla);
-
-	bool accesible = true;
 	
-	if (comprobarAgentes)
+	bool accesible = 0<= fil && fil < mapaResultado.size() && 0<=col && col<mapaResultado.at(0).size();
+	if (accesible && comprobarAgentes && mapaResultado.at(fil).at(col) != '?'){
 		// Esta línea se asegura de que alguna vez la ha visto
 		accesible &= mapaEntidades.at(fil).at(col) == '_'; // No hay agentes en la casilla
-	
+	}
 	// Comprobamos que es transitable
-	accesible &= CASILLAS_NO_TRANSITABLES.find(mapaResultado.at(fil).at(col)) == CASILLAS_NO_TRANSITABLES.end();
-	
-	if (comprobarAltura){
+	accesible = accesible && CASILLAS_NO_TRANSITABLES.find(mapaResultado.at(fil).at(col)) == CASILLAS_NO_TRANSITABLES.end();
+	if (accesible && comprobarAltura && mapaResultado.at(fil).at(col) != '?'){
 		int dif = abs(mapaCotas.at(filAgente).at(colAgente) - mapaCotas.at(fil).at(col));
 		accesible &= (dif<=1 || (conZapatillas && dif <=2));
 	}
@@ -314,106 +314,28 @@ int ComportamientoRescatador::determinaEmpatadas(vector<int> &casillasEmpatadas,
 int ComportamientoRescatador::veoCasillaInteresante(const Sensores & sensores){
 
 	// Tipos de casillas permitidas
-	vector<char> tiposCasillasPermitidas = {'X', 'D', 'C'}; // X: puesto base, D: zapatillas, C: camino
+	set<char> tiposCasillasPermitidas = {'X', 'D', 'C'}; // X: puesto base, D: zapatillas, C: camino
 	if (sensores.nivel == 1)
-		tiposCasillasPermitidas.push_back('S');
+		tiposCasillasPermitidas.insert('S');
 
-	// Obtenemos las casillas accesibles ***SOLO POR CAMINOS***
-	// Casilla Alcanzable: Casilla que puedo alcanzar (posiblemente no pueda acceder)
-	// Casilla Accesible: Casilla que puedo alcanzar y es accesible
-	// Casilla Alcanzable Directa: Casilla que puedo alcanzar directamente
-	// Casilla Alcanzable Indirecta: Casilla que puedo alcanzar indirectamente, he de comprobar que la casilla intermedia es accesible
-
-	// El orden de las casillas es relevante para hacer el mínimo número de pasos. Lo buscado: 6 8 4 2 3 1 -4 -5 -2 -4
-	const vector<int> casillasAlcanzablesDirectas 	= {2,3,1};
-	const vector<int> casillasAlcanzablesIndirectas = {6,8,4};
-	const vector<int> casillasAlcanzablesDirectas_Atras 	= {-2,-4};
-	const vector<int> casillasAlcanzablesIndirectas_Atras 	= {-1,-5};
-	vector<int> casillasAccesibles;
-	int fil,col;
-
-
-	// ------------ Casillas de Delante ----------------
-	for (int i=0; i<casillasAlcanzablesIndirectas.size(); i++){
-		// Para llegar a casillasAlcanzablesIndirectas.at(i), ha de pasar por casillasAccesibleDirectas.at(i)
-		int casillaIntermedia 	= casillasAlcanzablesDirectas.at(i);
-		int casillaFinal 		= casillasAlcanzablesIndirectas.at(i);
-
-		if (casillaAccesible(sensores, false, casillaIntermedia) && casillaAccesible(sensores, true, casillaFinal)){
-
-			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, casillaFinal);
-			bool finalPermitida =	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
-
-			// La intermedia no se pisa.
-			if (finalPermitida)
-				casillasAccesibles.push_back(casillaFinal);
-		}
-	}
-	for (auto i = casillasAlcanzablesDirectas.begin(); i != casillasAlcanzablesDirectas.end(); ++i){
-		if (casillaAccesible(sensores, true, *i)){
-			tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
-			bool permitida = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
-			if (permitida)
-				casillasAccesibles.push_back(*i);
-		}
-	}
-
-
-
-	// ------------ Casillas de Detrás ----------------
-	for (int i=0; i<casillasAlcanzablesIndirectas_Atras.size(); i++){
-		// Para llegar a casillasAlcanzablesIndirectas.at(i), ha de pasar por casillasAccesibleDirectas.at(i)
-		int casillaIntermedia 	= casillasAlcanzablesDirectas_Atras.at(i);
-		int casillaFinal 		= casillasAlcanzablesIndirectas_Atras.at(i);
-		if (casillaAccesible(sensores, false, casillaIntermedia) && casillaAccesible(sensores, true, casillaFinal)){
-
-			tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, casillaFinal);
-			bool finalPermitida =	find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
-
-			// La intermedia no se pisa.
-			if (finalPermitida)
-				casillasAccesibles.push_back(casillaFinal);
-		}
-	}
-	for (auto i = casillasAlcanzablesDirectas_Atras.begin(); i != casillasAlcanzablesDirectas_Atras.end(); ++i){
-		if (casillaAccesible(sensores, true, *i)){
-			tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
-			bool permitida = find(tiposCasillasPermitidas.begin(), tiposCasillasPermitidas.end(), mapaResultado.at(fil).at(col)) != tiposCasillasPermitidas.end();
-			if (permitida)
-				casillasAccesibles.push_back(*i);
-		}
-	}
-
-
-	#ifdef DEBUG_RESC
-	cout << "Casillas accesibles: " << endl;
-	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
-		tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
-		cout << "(" << fil << "," << col << ") " << mapaResultado.at(fil).at(col) << " " << *i << endl;
-	}
-	#endif
+	
+	// Buscamos las casillas accesibles
+	vector<int> casillasAccesibles = getCasillasAccesibles(sensores, true, tiposCasillasPermitidas);
 
 
 	// Buscamos la casilla más interesante a la que ir
 	int res = 0;	// Por defecto no veo nada interesante
+	int fil, col;
 
 	// Buscamos primero el puesto base
-	if (sensores.nivel == 0){
-		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
-			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
-			if (mapaResultado.at(fil).at(col) == 'X')
-				res = *i;
-		}
-	}
+	if (sensores.nivel == 0)
+		res = buscaCasilla(sensores, 'X', true, tiposCasillasPermitidas);
+	
 	
 	// Si no hay puesto base, miro si hay zapatillas
-	if (!tieneZapatillas){
-		for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
-			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
-			if (mapaResultado.at(fil).at(col) == 'D')
-				res = *i;
-		}
-	}
+	if (!tieneZapatillas)
+		res = buscaCasilla(sensores, 'D', true, tiposCasillasPermitidas);
+	
 			
 	
 	// Ahora, buscamos caminos. Pero tenemos que ver cuál es el más interesante
@@ -511,35 +433,7 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_0(Sensores sensor
 	}
 	else{ // Vamos a realizar el movimiento determinado por lo que veo
 		int res = veoCasillaInteresante(sensores);
-		switch (res){
-			case 1: // TURN_SL
-			case 4:
-				inTURN_SL = true;
-				action = Action::TURN_L;
-				break;
-			case 2: // WALK
-				action = Action::WALK;
-				break;
-			case 3: // TURN_SR
-			case 8:
-				action = Action::TURN_SR;
-				break;
-			case 6: // RUN
-				action = Action::RUN;
-				break;
-			case -1: // TURN_L
-			case -2:
-				action = Action::TURN_L;
-				break;
-			case -4:
-			case -5:
-				inTURN_R = true;
-				action = Action::TURN_SR;
-				break;
-			default: // No veo nada interesante
-				action = Action::TURN_L;
-				break;
-		}
+		action = comoLlegarA(res);
 
 	}
 
@@ -620,12 +514,13 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_1(Sensores sensor
 
 // -----------------------------------------------------------------------------
 
-ComportamientoRescatador::Estado ComportamientoRescatador::ejecutarAccion(Action action, const Estado & inicio){
+ComportamientoRescatador::Estado ComportamientoRescatador::ejecutarAccion(const Estado& estadoReal, Action action, const Estado & inicio){
 
 	Estado nuevoEstado = inicio;
+
 	switch (action){
 		case Action::RUN:
-			if (casillaAccesible(inicio, false, 2) && casillaAccesible(inicio, true, 6))
+			if (casillaAccesible(estadoReal, inicio, false, 2) && casillaAccesible(estadoReal, inicio, true, 6))
 				tie(nuevoEstado.fil, nuevoEstado.col) = aCoordenadas(inicio.fil, inicio.col, inicio.orientacion, 6);
 			break;
 		case Action::TURN_SR:
@@ -635,8 +530,9 @@ ComportamientoRescatador::Estado ComportamientoRescatador::ejecutarAccion(Action
 			nuevoEstado.orientacion = (Orientacion)((8+(int)inicio.orientacion - 2) % 8);
 			break;
 		case Action::WALK:
-			if (casillaAccesible(inicio, true, 2))
+			if (casillaAccesible(estadoReal, inicio, true, 2))
 				tie(nuevoEstado.fil, nuevoEstado.col) = aCoordenadas(inicio.fil, inicio.col, inicio.orientacion, 2);
+			
 			break;
 	}
 	
@@ -682,7 +578,6 @@ vector<Action> ComportamientoRescatador::Dijkstra(
 
 
 
-
 	bool caminoOptimoEncontrado = false;
 	while(!frontera.empty() && !caminoOptimoEncontrado){
 
@@ -706,18 +601,17 @@ vector<Action> ComportamientoRescatador::Dijkstra(
 			// Exploramos los nodos resultantes de aplicar cada una de las acciones
 			Nodo nuevoNodo;
 
-
 			for (auto it = acciones.begin(); it != acciones.end(); ++it){
-				nuevoNodo.estado = ejecutarAccion(*it, nodoActual.estado);
+				
+				nuevoNodo.estado = ejecutarAccion(origen, *it, nodoActual.estado);
 
 				// Comprobamos que se ha generado un nodo nuevo
 				if (visitados.find(nuevoNodo) == visitados.end()){
-
+					
 					// Modificamos el gasto de energía del nuevo nodo
 					nuevoNodo.gastoEnergia = nodoActual.gastoEnergia + gastoAccion(*it, nodoActual.estado.fil, nodoActual.estado.col, nuevoNodo.estado.fil, nuevoNodo.estado.col);
 					nuevoNodo.acciones = nodoActual.acciones;
-					nuevoNodo.acciones.push_back(*it);
-					
+					nuevoNodo.acciones.push_back(*it);					
 
 					// Añadimos el nuevo nodo a la frontera (podrá estar ya, pero podemos haber encontrado un camino mejor)
 					frontera.push(nuevoNodo);
@@ -751,7 +645,7 @@ void ComportamientoRescatador::VisualizaPlan(const Estado& origen, const vector<
 
 	for(auto it = plan.begin(); it != plan.end(); ++it){
 
-		estadoActual = ejecutarAccion(*it, estadoActual);
+		estadoActual = ejecutarAccion(origen, *it, estadoActual);
 
 		if (!estadoActual.tieneZapatillas && mapaResultado.at(estadoActual.fil).at(estadoActual.col) == 'D')
 			estadoActual.tieneZapatillas = true;
@@ -769,7 +663,10 @@ void ComportamientoRescatador::VisualizaPlan(const Estado& origen, const vector<
 
 int ComportamientoRescatador::gastoAccion(Action action, int filInicio, int colInicio, int filDestino, int colDestino){
 	int gasto=0;
-	int difAltura = mapaCotas.at(filDestino).at(colDestino) - mapaCotas.at(filInicio).at(colInicio);
+	int difAltura=-1;	// Si no es reconocida, fomentamos que vaya ahí
+	if (mapaResultado.at(filInicio).at(colInicio) != '?')
+		difAltura = mapaCotas.at(filDestino).at(colDestino) - mapaCotas.at(filInicio).at(colInicio);
+	
 	if (difAltura > 0)
 		difAltura = 1;
 	else if (difAltura < 0)
@@ -791,7 +688,7 @@ int ComportamientoRescatador::gastoAccion(Action action, int filInicio, int colI
 					gasto = 2;
 					gasto += difAltura * 1;
 					break;
-				default:
+				default:	// case == '?'
 					gasto = 1;
 					gasto += difAltura * 0;
 					break;
@@ -859,6 +756,10 @@ int ComportamientoRescatador::gastoAccion(Action action, int filInicio, int colI
 Action ComportamientoRescatador::ComportamientoRescatadorNivel_2(Sensores sensores)
 {
 	Action accion= IDLE;
+
+	// Actualización de variables de estado.
+	situarSensorEnMapa(mapaResultado, mapaCotas, mapaEntidades, sensores);
+
 	if (plan.empty() && (sensores.posF != sensores.destinoF || sensores.posC != sensores.destinoC)){
 
 
@@ -886,6 +787,7 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_2(Sensores sensor
 		}
 	}
 
+	lastAction = accion;	// Actualizamos la última acción realizada
 	return accion;
 }
 
@@ -895,8 +797,217 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_3(Sensores sensor
 	return accion;
 }
 
+
+void ComportamientoRescatador::actualizaPuestosBase(const Sensores& sensores)
+{	
+	for (int i=0; i<NUM_CASILLAS; ++i)
+		if(sensores.superficie.at(i) == 'X'){
+			int fil, col;
+			tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
+
+			puestosBase.insert(make_pair(fil, col));
+		}
+}
+
 Action ComportamientoRescatador::ComportamientoRescatadorNivel_4(Sensores sensores)
 {
 	Action accion= IDLE;
+
+	// Actualización de variables de estado.
+	situarSensorEnMapa(mapaResultado, mapaCotas, mapaEntidades, sensores);
+	actualizaPuestosBase(sensores);
+	if (!tieneZapatillas && sensores.superficie.at(0) == 'D')
+		tieneZapatillas = true;
+
+	int destinoF = sensores.destinoF;
+	int destinoC = sensores.destinoC;
+
+	if (!enDestino && sensores.posF == destinoF && sensores.posC == destinoC){
+
+		// Acabamos de llegar al destino
+		enDestino = true;
+		if (sensores.gravedad)
+			accion = Action::CALL_ON;
+	}
+	if (enDestino && (sensores.posF != destinoF || sensores.posC != destinoC)){
+		// Hemos salido del destino
+		enDestino = false;
+	}
+
+
+	// Buscamos zapatillas al alrededor del agente
+	if (accion == Action::IDLE && !tieneZapatillas){
+		int res = buscaCasilla(sensores, 'D', false);
+		if (res != 0)
+			accion = comoLlegarA(res);
+	}
+
+
+	if (accion == Action::IDLE){
+		// Inicializamos el nodo origen
+		Estado origen;
+		origen.fil = sensores.posF;
+		origen.col = sensores.posC;
+		origen.orientacion = sensores.rumbo;
+		origen.tieneZapatillas = tieneZapatillas;
+
+		plan = Dijkstra(origen, sensores.destinoF, sensores.destinoC);
+		VisualizaPlan(origen, plan);
+		if (!plan.empty())
+			accion = *plan.begin();
+	}
+
+
+	lastAction = accion;	// Actualizamos la última acción realizada
 	return accion;
+}
+
+
+int ComportamientoRescatador::buscaCasilla(const Sensores& sensores, char tipo, bool hayLimitacion, set<char> casillasPermitidas){
+
+	int res=0;
+	int fil, col;
+
+	vector<int> casillasAccesibles = getCasillasAccesibles(sensores, hayLimitacion, casillasPermitidas);
+	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end() && res == 0; ++i){
+		tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+		if (mapaResultado.at(fil).at(col) == tipo)
+			res = *i;
+	}
+
+	return res;
+}
+
+
+Action ComportamientoRescatador::comoLlegarA(int casilla){
+	Action action;
+
+	switch (casilla){
+		case 1: // TURN_SL
+		case 4:
+			inTURN_SL = true;
+			action = Action::TURN_L;
+			break;
+		case 2: // WALK
+			action = Action::WALK;
+			break;
+		case 3: // TURN_SR
+		case 8:
+			action = Action::TURN_SR;
+			break;
+		case 6: // RUN
+			action = Action::RUN;
+			break;
+		case -1: // TURN_L
+		case -2:
+			action = Action::TURN_L;
+			break;
+		case -4:
+		case -5:
+			inTURN_R = true;
+			action = Action::TURN_SR;
+			break;
+		default: // No veo nada interesante
+			action = Action::TURN_L;
+			break;
+	}
+
+	return action;
+}
+
+
+
+vector<int> ComportamientoRescatador::getCasillasAccesibles(const Sensores & sensores, bool hayLimitacion, const set<char> &casillasPermitidas){
+
+	// Obtenemos las casillas accesibles
+	// Casilla Alcanzable: Casilla que puedo alcanzar (posiblemente no pueda acceder)
+	// Casilla Accesible: Casilla que puedo alcanzar y es accesible
+	// Casilla Alcanzable Directa: Casilla que puedo alcanzar directamente
+	// Casilla Alcanzable Indirecta: Casilla que puedo alcanzar indirectamente, he de comprobar que la casilla intermedia es accesible
+
+	// El orden de las casillas es relevante para hacer el mínimo número de pasos. Lo buscado: 6 8 4 2 3 1 -4 -5 -2 -4
+	const vector<int> casillasAlcanzablesDirectas 	= {2,3,1};
+	const vector<int> casillasAlcanzablesIndirectas = {6,8,4};
+	const vector<int> casillasAlcanzablesDirectas_Atras 	= {-2,-4};
+	const vector<int> casillasAlcanzablesIndirectas_Atras 	= {-1,-5};
+	vector<int> casillasAccesibles;
+	int fil,col;
+
+
+	// ------------ Casillas de Delante ----------------
+	for (int i=0; i<casillasAlcanzablesIndirectas.size(); i++){
+		// Para llegar a casillasAlcanzablesIndirectas.at(i), ha de pasar por casillasAccesibleDirectas.at(i)
+		int casillaIntermedia 	= casillasAlcanzablesDirectas.at(i);
+		int casillaFinal 		= casillasAlcanzablesIndirectas.at(i);
+
+		if (casillaAccesible(sensores, false, casillaIntermedia) && casillaAccesible(sensores, true, casillaFinal)){
+			bool aniade = true;
+			if (hayLimitacion){
+				// Si hay limitación, sólo se añaden las casillas que están en la lista de permitidas
+				tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, casillaFinal);
+				aniade = find(casillasPermitidas.begin(), casillasPermitidas.end(), mapaResultado.at(fil).at(col)) != casillasPermitidas.end();
+			}
+
+			if (aniade)
+				casillasAccesibles.push_back(casillaFinal);
+		}
+	}
+	for (auto i = casillasAlcanzablesDirectas.begin(); i != casillasAlcanzablesDirectas.end(); ++i){
+		if (casillaAccesible(sensores, true, *i)){
+			bool aniade = true;
+			if (hayLimitacion){
+				// Si hay limitación, sólo se añaden las casillas que están en la lista de permitidas
+				tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+				aniade = find(casillasPermitidas.begin(), casillasPermitidas.end(), mapaResultado.at(fil).at(col)) != casillasPermitidas.end();			
+			}
+
+			if (aniade)
+				casillasAccesibles.push_back(*i);
+		}
+	}
+
+
+
+	// ------------ Casillas de Detrás ----------------
+	for (int i=0; i<casillasAlcanzablesIndirectas_Atras.size(); i++){
+		// Para llegar a casillasAlcanzablesIndirectas.at(i), ha de pasar por casillasAccesibleDirectas.at(i)
+		int casillaIntermedia 	= casillasAlcanzablesDirectas_Atras.at(i);
+		int casillaFinal 		= casillasAlcanzablesIndirectas_Atras.at(i);
+		if (casillaAccesible(sensores, false, casillaIntermedia) && casillaAccesible(sensores, true, casillaFinal)){
+			
+			bool aniade = true;
+			if (hayLimitacion){
+				// Si hay limitación, sólo se añaden las casillas que están en la lista de permitidas
+				tie(fil,col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, casillaFinal);
+				aniade = find(casillasPermitidas.begin(), casillasPermitidas.end(), mapaResultado.at(fil).at(col)) != casillasPermitidas.end();
+			}
+
+			if (aniade)
+				casillasAccesibles.push_back(casillaFinal);
+		}
+	}
+	for (auto i = casillasAlcanzablesDirectas_Atras.begin(); i != casillasAlcanzablesDirectas_Atras.end(); ++i){
+		if (casillaAccesible(sensores, true, *i)){
+			
+			bool aniade = true;
+			if (hayLimitacion){
+				// Si hay limitación, sólo se añaden las casillas que están en la lista de permitidas
+				tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+				aniade = find(casillasPermitidas.begin(), casillasPermitidas.end(), mapaResultado.at(fil).at(col)) != casillasPermitidas.end();
+			}
+			if (aniade)
+				casillasAccesibles.push_back(*i);
+		}
+	}
+
+
+	#ifdef DEBUG_RESC
+	cout << "Casillas accesibles: " << endl;
+	for (auto i = casillasAccesibles.begin(); i != casillasAccesibles.end(); ++i){
+		tie(fil,col)=aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, *i);
+		cout << "(" << fil << "," << col << ") " << mapaResultado.at(fil).at(col) << " " << *i << endl;
+	}
+	#endif
+
+	return casillasAccesibles;
 }

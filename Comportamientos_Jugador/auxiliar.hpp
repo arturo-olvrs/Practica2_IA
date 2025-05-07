@@ -6,6 +6,7 @@
 #include <thread>
 #include <unordered_set>
 #include <vector>
+#include <set>
 
 using namespace std;
 
@@ -27,6 +28,9 @@ public:
     vector<int> fila(size, 0);
     numVecesVisitada.resize(size, fila);
     numVecesVista.resize(size, fila);
+
+    // Inicializar el conjunto de puestos base
+    puestosBase = set<pair<int, int>>();
   }
   ComportamientoAuxiliar(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
@@ -65,6 +69,9 @@ private:
   vector<Action> plan;  // Lista de acciones que forman el camino a seguir
   int numEnPlan;        // Número de la acción en el plan que se está ejecutando
   static const int MAYOR_COSTE = 5;
+
+  // Definir el conjunto de puestos base
+  set<pair<int, int>> puestosBase; // Conjunto de puestos base
 
 
   /**
@@ -270,6 +277,43 @@ private:
    * @param plan    Lista de acciones a seguir.
    */
   void VisualizaPlan(const Estado& origen, const vector<Action>& plan);
+
+  /**
+   * @brief Método que actualiza la variable privada puestosBase.
+   * 
+   * @param sensores  Estructura de datos que contiene la información de los sensores.
+   */
+  void actualizaPuestosBase(const Sensores& sensores);
+
+
+  /**
+   * @brief Método que devuelve las casillas accesibles.
+   * 
+   * @param sensores  Estructura de datos que contiene la información de los sensores.
+   * @param hayLimitacion  Indica si hay limitación de las casillas que se pueden visitar.
+   * @param casillasPermitidas  Conjunto de casillas permitidas pisar. Solo se usa si hayLimitacion es true.
+   * 
+   * @return  Lista de casillas accesibles.
+   */
+  vector<int> getCasillasAccesibles(const Sensores & sensores, bool hayLimitacion, const set<char> &casillasPermitidas=set<char>());
+
+  
+  /**
+   * @brief Método que devuelve la acción a realizar para llegar a una casilla.
+   * 
+   * @param casilla  Número de la casilla a la que se quiere llegar.
+   */
+  Action comoLlegarA(int casilla);
+
+  /**
+   * @brief Método que busca al alrededor del agente una casilla de un tipo determinado.
+   * 
+   * @param Sensores  Estructura de datos que contiene la información de los sensores.
+   * @param tipo  Tipo de casilla a buscar.
+   * @param hayLimitacion  Indica si hay limitación de las casillas que se pueden visitar.
+   * @param casillasPermitidas  Conjunto de casillas permitidas pisar. Solo se usa si hayLimitacion es true.
+   */
+  int buscaCasilla(const Sensores& sensores, char tipo, bool hayLimitacion, set<char> casillasPermitidas=set<char>());
 };
 
 #endif
