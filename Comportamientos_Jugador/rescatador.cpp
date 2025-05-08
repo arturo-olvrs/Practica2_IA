@@ -838,20 +838,34 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_4(Sensores sensor
 	actualizaPuestosBase(sensores);
 	if (!tieneZapatillas && sensores.superficie.at(0) == 'D')
 		tieneZapatillas = true;
-	int destinoF = sensores.destinoF;
-	int destinoC = sensores.destinoC;
+	
+	set<pair<int, int>> destino;
+	destino.insert(make_pair(sensores.destinoF, sensores.destinoC));
 
+	// Detectar que entramos en destino
+	if (!enDestino && sensores.posF == sensores.destinoF && sensores.posC == sensores.destinoC){
 
-	if (!enDestino && sensores.posF == destinoF && sensores.posC == destinoC){
-
-		// Acabamos de llegar al destino y permanecemos en él
+		// Acabamos de llegar al destino
 		enDestino = true;
-		if (sensores.gravedad)
-			accion = Action::CALL_ON;
+		numVecesEnDestino++;
+
+		// Detectar que entramos a ese destino por primera vez
+		if (numVecesEnDestino == 1){
+
+			ultDestF = sensores.destinoF;
+			ultDestC = sensores.destinoC;
+			if (sensores.gravedad)
+				accion = Action::CALL_ON;
+		}
 	}
-	if (enDestino && (sensores.posF != destinoF || sensores.posC != destinoC)){
+	else if (enDestino && (sensores.posF != ultDestF || sensores.posC != ultDestC)){
 		// Hemos salido del destino
 		enDestino = false;
+
+		// Si también hemos cambiado de destino, actualizamos yaRecargado
+		if(ultDestF != sensores.destinoF || ultDestC != sensores.destinoC){
+			numVecesEnDestino = 0;
+		}
 	}
 
 	// Buscamos zapatillas al alrededor del agente
@@ -863,7 +877,25 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_4(Sensores sensor
 		}
 	}
 
-	if (accion == Action::IDLE && !enDestino){
+	// Determinamos si recargar o no
+	if (accion == Action::IDLE && numVecesEnDestino <= 1){
+		if (!aRecargar && !puestosBase.empty()){
+			recargarHasta = sensores.energia + CANTIDAD_RECARGA;
+			aRecargar |= sensores.energia < VIDA_A_RECARGAR && sensores.vida > VIDA_A_RECARGAR;
+			aRecargar |= enDestino && recargarHasta < max(sensores.vida, 2000);
+		}
+		else if (aRecargar && sensores.energia < recargarHasta){
+			destino=puestosBase;
+		}
+		else if (aRecargar && sensores.energia >= recargarHasta){
+			aRecargar = false;
+			destino.clear();
+			destino.insert(make_pair(sensores.destinoF, sensores.destinoC));
+		}
+	}
+
+
+	if (accion == Action::IDLE){
 		// Inicializamos el nodo origen
 		Estado origen;
 		origen.fil = sensores.posF;
@@ -904,7 +936,7 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_4(Sensores sensor
 
 		if (recalcular){
 			reseteaPlan();
-			plan = Dijkstra(origen, sensores.destinoF, sensores.destinoC, aEvitar);
+			plan = Dijkstra(origen, destino, aEvitar);
 			VisualizaPlan(origen, plan);
 		}
 

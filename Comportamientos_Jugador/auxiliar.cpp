@@ -820,8 +820,15 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_4(Sensores sensores)
 						accion = *plan.begin();
 				}
 				else{
-					// Si estamos en un destino, probamos con otra orientación
-					accion = Action::TURN_SR;
+					// Si estamos en un destino, tenemos que girar hasta ver el destino
+					bool encontrado = false;
+					for (int i=0; i<NUM_CASILLAS && !encontrado; ++i){
+						int fil, col;
+						tie(fil, col) = aCoordenadas(sensores.posF, sensores.posC, sensores.rumbo, i);
+						encontrado = fil==sensores.destinoF && col==sensores.destinoC;
+					}
+					if (!encontrado)
+						accion = Action::TURN_SR;
 				}				
 			}
 	}

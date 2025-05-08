@@ -40,6 +40,11 @@ public:
     plan= vector<Action>();
     numEnPlan = 0;
     teniaZapatillas = false;
+    aRecargar = false;
+    recargarHasta = 0;
+    numVecesEnDestino = 0;
+    ultDestF = -1;
+    ultDestC = -1;
   }
   ComportamientoRescatador(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
@@ -79,8 +84,16 @@ private:
   int numEnPlan;       // Número de la acción en el plan que se está ejecutando
 
   set<pair<int, int>> puestosBase; // Conjunto de puestos base que ha encontrado el rescatador
-  bool enDestino;                   // Indica si el rescatador ha llegado a su destino
+  
   bool teniaZapatillas;             // Indica si el agente tenía zapatillas en el paso anterior
+  static const int VIDA_A_RECARGAR = 200;
+  const int CANTIDAD_RECARGA = mapaResultado.size() * 10;
+  bool enDestino;                   // Indica si el rescatador ha llegado a su destino
+  bool aRecargar;                 // Indica si el rescatador tiene que recargar
+  int recargarHasta;             // Indica hasta qué energía tiene que recargar
+  int numVecesEnDestino;        // Número de veces que ha llegado a la casilla destino sin que este cambie (entrar y salir)
+  int ultDestF;                    // Fila del destino del paso anterior
+  int ultDestC;                    // Columna del destino del paso anterior
 
 
 
