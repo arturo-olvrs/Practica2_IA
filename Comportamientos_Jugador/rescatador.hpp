@@ -39,7 +39,7 @@ public:
     enDestino = false;
     plan= vector<Action>();
     numEnPlan = 0;
-    nextPos = make_pair(-1, -1);
+    teniaZapatillas = false;
   }
   ComportamientoRescatador(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
@@ -80,7 +80,7 @@ private:
 
   set<pair<int, int>> puestosBase; // Conjunto de puestos base que ha encontrado el rescatador
   bool enDestino;                   // Indica si el rescatador ha llegado a su destino
-  pair<int, int> nextPos;           // Posición a la que se quiere mover el agente
+  bool teniaZapatillas;             // Indica si el agente tenía zapatillas en el paso anterior
 
 
 
@@ -265,6 +265,17 @@ private:
    * @return  Lista de acciones a seguir para llegar al destino.
    */
   vector<Action> Dijkstra(const Estado& origen, int filDestino, int colDestino, const set<pair<int, int>>& aEvitar=set<pair<int, int>>());
+
+  /**
+   * @brief Método que implementa el algoritmo de Dijkstra para encontrar el camino más corto.
+   * 
+   * @param origen  Estado de origen.
+   * @param setDestinos  Conjunto de destinos válidos.
+   * @param aEvitar  Conjunto de casillas a evitar.
+   * 
+   * @return  Lista de acciones a seguir para llegar al destino.
+   */
+  vector<Action> Dijkstra(const Estado& origen, const set<pair<int, int>>& setDestinos, const set<pair<int, int>>& aEvitar=set<pair<int, int>>());
   
   /**
    * @brief Método que calcula el gasto de energía al realizar una acción.

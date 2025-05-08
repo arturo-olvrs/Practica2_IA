@@ -31,6 +31,7 @@ public:
 
     // Inicializar el conjunto de puestos base
     puestosBase = set<pair<int, int>>();
+    teniaZapatillas = false;
   }
   ComportamientoAuxiliar(std::vector<std::vector<unsigned char>> mapaR, std::vector<std::vector<unsigned char>> mapaC) : Comportamiento(mapaR,mapaC)
   {
@@ -72,6 +73,7 @@ private:
 
   // Definir el conjunto de puestos base
   set<pair<int, int>> puestosBase; // Conjunto de puestos base
+  bool teniaZapatillas;             // Indica si el agente tenía zapatillas en el paso anterior
 
 
   /**
@@ -254,6 +256,18 @@ private:
    * @return  Lista de acciones a seguir para llegar al destino.
    */
   vector<Action> A_Estrella(const Estado& origen, int filDestino, int colDestino);
+
+  /**
+   * @brief Método que implementa el algoritmo de A* para encontrar el camino más corto.
+   * Versión para un conjunto de destinos.
+   * 
+   * @param origen  Estado de origen.
+   * @param setDestinos  Conjunto de destinos válidos.
+   * @param destReferencia  Destino de referencia, que se usará para calcular la heurística.
+   * 
+   * @return  Lista de acciones a seguir para llegar al destino.
+   */
+  vector<Action> A_Estrella(const Estado& origen, const set<pair<int, int>>& setDestinos, const pair<int, int>& destReferencia);
   
   /**
    * @brief Método que calcula el gasto de energía al realizar una acción.

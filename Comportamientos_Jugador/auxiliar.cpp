@@ -240,16 +240,18 @@ bool ComportamientoAuxiliar::casillaAccesible(int filAgente, int colAgente, Orie
 	// 2. La diferencia de altura entre la casilla y la cota del rescatador es <= 1
 	int fil, col;
 	tie(fil, col) = aCoordenadas(filAgente, colAgente, orientacion, casilla);
-	bool accesible = 0<= fil && fil < mapaResultado.size() && 0<=col && col<mapaResultado.at(0).size();
 
+
+	bool accesible = 0<= fil && fil < mapaResultado.size() && 0<=col && col<mapaResultado.at(0).size();
 	if (accesible && comprobarAgentes)
 		// Esta línea se asegura de que alguna vez la ha visto
 		accesible &= mapaEntidades.at(fil).at(col) == '_'; // No hay agentes en la casilla
 	accesible = accesible && (CASILLAS_NO_TRANSITABLES.find(mapaResultado.at(fil).at(col)) == CASILLAS_NO_TRANSITABLES.end() || (conZapatillas && mapaResultado.at(fil).at(col) == 'B'));
-	if (accesible && mapaResultado.at(fil).at(col) != '?'){
+	if (accesible && mapaCotas.at(fil).at(col) != 0 && mapaCotas.at(filAgente).at(colAgente) != 0){
 		int dif = abs(mapaCotas.at(filAgente).at(colAgente) - mapaCotas.at(fil).at(col));
 		accesible &= dif<=1;
 	}
+	
 
 	return accesible;
 }
@@ -505,7 +507,6 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_2(Sensores sensores)
 // -----------------------------------------------------------------------------
 
 ComportamientoAuxiliar::Estado ComportamientoAuxiliar::ejecutarAccion(Action action, const Estado & inicio){
-
 	Estado nuevoEstado = inicio;
 	switch (action){
 		case Action::TURN_SR:
@@ -584,12 +585,22 @@ int ComportamientoAuxiliar::Heuristica(const Estado& estado, int filDestino, int
 	return max(difFil, difCol);
 }
 
-
-
 vector<Action> ComportamientoAuxiliar::A_Estrella(
 	const Estado &origen,
 	int filDestino,
 	int colDestino)
+{
+	set<pair<int, int>> setDestinos;
+	setDestinos.insert(make_pair(filDestino, colDestino));
+	return A_Estrella(origen, setDestinos, make_pair(filDestino, colDestino));
+}
+
+
+
+vector<Action> ComportamientoAuxiliar::A_Estrella(
+	const Estado &origen,
+	const set<pair<int, int>>& setDestinos,
+	const pair<int, int>& destReferencia)
 {
 
 	// Acciones posibles del agente
@@ -612,7 +623,7 @@ vector<Action> ComportamientoAuxiliar::A_Estrella(
 	};
 
 
-	priority_queue<Nodo, vector<Nodo>, Comparador> frontera(Comparador(filDestino, colDestino));
+	priority_queue<Nodo, vector<Nodo>, Comparador> frontera(Comparador(destReferencia.first, destReferencia.second));
 
 	// Nodos ya visitados, para evitar repeticiones
 	set<Nodo> visitados;
@@ -634,18 +645,23 @@ vector<Action> ComportamientoAuxiliar::A_Estrella(
 		frontera.pop();
 
 		// Comprobamos si el nodo actual es el destino
-		caminoOptimoEncontrado = (nodoActual.estado.fil == filDestino && nodoActual.estado.col == colDestino);
+		caminoOptimoEncontrado = setDestinos.find(make_pair(nodoActual.estado.fil, nodoActual.estado.col)) != setDestinos.end();
 		
 		if (!caminoOptimoEncontrado && visitados.insert(nodoActual).second){
 
 			#ifdef DEBUG_DIJKSTRA_AUX
 				interaciones++;
 			#endif
+			
 
 
 			// Actualizamos el estado de las zapatillas
-			if (!nodoActual.estado.tieneZapatillas && mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == 'D')
+			if (!nodoActual.estado.tieneZapatillas &&
+				(mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == 'D'
+				|| mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == '?')
+			)
 				nodoActual.estado.tieneZapatillas = true;
+			
 
 			// Exploramos los nodos resultantes de aplicar cada una de las acciones
 			Nodo nuevoNodo;
@@ -782,10 +798,31 @@ Action ComportamientoAuxiliar::ComportamientoAuxiliarNivel_4(Sensores sensores)
 				origen.orientacion = sensores.rumbo;
 				origen.tieneZapatillas = tieneZapatillas;
 
-				plan = A_Estrella(origen, sensores.destinoF, sensores.destinoC);
-				VisualizaPlan(origen, plan);
-				if (!plan.empty())
-					accion = *plan.begin();
+
+				set<pair<int, int>> setDestinos;
+				for(int difFil = -(PROFUNDIDAD_SENSOR-1); difFil <= PROFUNDIDAD_SENSOR-1; ++difFil){
+					for(int difCol = -(PROFUNDIDAD_SENSOR-1); difCol <= PROFUNDIDAD_SENSOR-1; ++difCol){
+						int filDestino = sensores.destinoF + difFil;
+						int colDestino = sensores.destinoC + difCol;
+						if (0 <= filDestino && filDestino < mapaResultado.size() &&
+							0 <= colDestino && colDestino < mapaResultado.at(0).size()){
+							setDestinos.insert(make_pair(filDestino, colDestino));
+						}
+					}
+				}
+
+				// Si no estamos en un Destino, buscamos el camino
+				if (setDestinos.find(make_pair(sensores.posF, sensores.posC)) == setDestinos.end()){
+					// Buscamos el camino
+					plan = A_Estrella(origen, setDestinos, make_pair(sensores.destinoF, sensores.destinoC));
+					VisualizaPlan(origen, plan);
+					if (!plan.empty())
+						accion = *plan.begin();
+				}
+				else{
+					// Si estamos en un destino, probamos con otra orientación
+					accion = Action::TURN_SR;
+				}				
 			}
 	}
 

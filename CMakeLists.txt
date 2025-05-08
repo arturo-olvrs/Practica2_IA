@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 project(Motor_Grafico_Belkan)
 
 # problema deteccion librerias glut - mgo -------
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L/usr/lib/x86_64-linux-gnu -lglut")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -L/usr/lib/x86_64-linux-gnu -lglut -O2")
 set(CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/libglut")
 
 #########################################################

@@ -241,20 +241,17 @@ bool ComportamientoRescatador::casillaAccesible(int filAgente, int colAgente, Or
 	int fil, col;
 	tie(fil, col) = aCoordenadas(filAgente, colAgente, orientacion, casilla);
 
-	
 	bool accesible = 0<= fil && fil < mapaResultado.size() && 0<=col && col<mapaResultado.at(0).size();
 	if (accesible && comprobarAgentes && mapaResultado.at(fil).at(col) != '?'){
 		// Esta línea se asegura de que alguna vez la ha visto
 		accesible &= mapaEntidades.at(fil).at(col) == '_'; // No hay agentes en la casilla
 	}
-
 	// Comprobamos que es transitable
 	accesible = accesible && CASILLAS_NO_TRANSITABLES.find(mapaResultado.at(fil).at(col)) == CASILLAS_NO_TRANSITABLES.end();
-	if (accesible && comprobarAltura && mapaResultado.at(fil).at(col) != '?'){
+	if (accesible && comprobarAltura && mapaCotas.at(fil).at(col) != 0 && mapaCotas.at(filAgente).at(colAgente) != 0){
 		int dif = abs(mapaCotas.at(filAgente).at(colAgente) - mapaCotas.at(fil).at(col));
 		accesible &= (dif<=1 || (conZapatillas && dif <=2));
 	}
-	
 	return accesible;
 }
 
@@ -550,14 +547,24 @@ pair<ComportamientoRescatador::Estado, bool> ComportamientoRescatador::ejecutarA
 }
 
 
-
 vector<Action> ComportamientoRescatador::Dijkstra(
 	const Estado &origen,
 	int filDestino,
 	int colDestino,
+	const set<pair<int, int>>& aEvitar){
+
+		set<pair<int, int>> setDestinos;
+		setDestinos.insert(make_pair(filDestino, colDestino));
+		return Dijkstra(origen, setDestinos, aEvitar);
+	}
+
+
+
+vector<Action> ComportamientoRescatador::Dijkstra(
+	const Estado &origen,
+	const set<pair<int, int>>& setDestinos,
 	const set<pair<int, int>>& aEvitar)
 {
-
 	// Acciones posibles del agente
 	const vector<Action> acciones = {Action::RUN, Action::WALK, Action::TURN_SR, Action::TURN_L};
 
@@ -594,7 +601,7 @@ vector<Action> ComportamientoRescatador::Dijkstra(
 		frontera.pop();
 
 		// Comprobamos si el nodo actual es el destino
-		caminoOptimoEncontrado = (nodoActual.estado.fil == filDestino && nodoActual.estado.col == colDestino);
+		caminoOptimoEncontrado = setDestinos.find(make_pair(nodoActual.estado.fil, nodoActual.estado.col)) != setDestinos.end();
 		
 		if (!caminoOptimoEncontrado && visitados.insert(nodoActual).second){
 
@@ -604,7 +611,10 @@ vector<Action> ComportamientoRescatador::Dijkstra(
 
 
 			// Actualizamos el estado de las zapatillas
-			if (!nodoActual.estado.tieneZapatillas && mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == 'D')
+			if (!nodoActual.estado.tieneZapatillas &&
+				(mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == 'D'
+				|| mapaResultado.at(nodoActual.estado.fil).at(nodoActual.estado.col) == '?')
+			)
 				nodoActual.estado.tieneZapatillas = true;
 
 			// Exploramos los nodos resultantes de aplicar cada una de las acciones
@@ -615,6 +625,7 @@ vector<Action> ComportamientoRescatador::Dijkstra(
 
 				tie(nuevoNodo.estado, ejecutada) = ejecutarAccion(*it, nodoActual.estado, aEvitar);
 
+				
 				// Comprobamos que se ha generado un nodo nuevo.
 				// Es necesario comprobar ambas, porque puede ser que se haya ejecutado pero haya llegado a uno conocido
 				if (ejecutada && visitados.find(nuevoNodo) == visitados.end()){
@@ -878,18 +889,18 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_4(Sensores sensor
 		#endif
 
 		bool recalcular = nuevasDescubiertas;
-		cout << "---------------------------------" << endl;
-		if (recalcular) cout << "Recalcular0" << endl;
 		recalcular |= plan.empty();
-		if (recalcular) cout << "Recalcular1" << endl;
 		
 		// Control de los empujes
-		recalcular |= nextPos != make_pair(sensores.posF, sensores.posC);
-		if (recalcular) cout << "Recalcular2" << endl;
+		recalcular |= sensores.choque;
 
 		// Control de la acción ejecutada
 		recalcular = recalcular || !ejecutarAccion(plan.at(numEnPlan), origen, aEvitar).second;
-		if (recalcular) cout << "Recalcular3" << endl;
+
+		if (tieneZapatillas && !teniaZapatillas){
+			teniaZapatillas = true;
+			recalcular = true;
+		}
 
 		if (recalcular){
 			reseteaPlan();
@@ -905,9 +916,6 @@ Action ComportamientoRescatador::ComportamientoRescatadorNivel_4(Sensores sensor
 				reseteaPlan();
 			
 		}
-
-		Estado nextEstado = ejecutarAccion(accion, origen, aEvitar).first;
-		nextPos = make_pair(nextEstado.fil, nextEstado.col);
 	}
 
 
