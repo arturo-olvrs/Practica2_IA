@@ -34,7 +34,7 @@ struct Sensores {
   int destinoF;
   int destinoC;
   bool venpaca;  // Avisa al auxiliar que vaya a las coordenadas destino
-  int gravedad;  // Indica la gravedad del accidentado 0: no se sabe, 1: puede andar por su propio pie, 2: necesita ayuda para andar.
+  bool gravedad;  // Indica la gravedad del accidentado: True => Necesita auxiliar 
 
 };
 

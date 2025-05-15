@@ -38,7 +38,7 @@ add_definitions(${OpenMP_DEFINITIONS})
 if(NOT OPENMP_FOUND)
     message(ERROR " OPENMP not found!")
 endif(NOT OPENMP_FOUND)
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 
 #########################################################
 # FIND LIBJPEG
@@ -63,7 +63,7 @@ file(GLOB SOURCES_GLUI "src/glui/*.cpp" "src/glui/*.cxx" "src/glui/*.cc")
 file(GLOB SOURCES_COMPORTAMIENTOS "src/comportamientos/*.cpp" "src/comportamientos/*.cxx" "src/comportamientos/*.cc" "Comportamientos_Jugador/*.cpp")
 include_directories("include")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -std=c++17")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -std=c++17 -O2 -march=native")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
