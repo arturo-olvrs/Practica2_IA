@@ -522,7 +522,6 @@ pair<ComportamientoRescatador::Estado, bool> ComportamientoRescatador::ejecutarA
 
 	Estado nuevoEstado = inicio;
 
-
 	switch (action){
 		case Action::RUN:
 			if (casillaAccesible(inicio, false, 2, aEvitar) && casillaAccesible(inicio, true, 6, aEvitar)){
@@ -619,7 +618,7 @@ vector<Action> ComportamientoRescatador::Dijkstra(
 
 			// Exploramos los nodos resultantes de aplicar cada una de las acciones
 			Nodo nuevoNodo;
-			bool ejecutada;
+			bool ejecutada;	// Determina si la acción ha podido ser ejecutada o no
 
 			for (auto it = acciones.begin(); it != acciones.end(); ++it){
 
