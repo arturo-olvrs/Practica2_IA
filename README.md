@@ -3,6 +3,10 @@
 # Inteligencia Artificial - Práctica 2
 
 - **Autor:** Arturo Olivares Martos
+- **Curso Academico:** 2024/2025
+- **Asignatura:** Inteligencia Artificial
+- **Grupo:** 2
+- **Profesorado:** Nuria Rodríguez Barroso (comunes para todo el departamento).
 - **Descripción:** Práctia 2 de la asignatura Inteligencia Artificial.
 
 ---
